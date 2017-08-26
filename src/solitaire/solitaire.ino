@@ -16,8 +16,24 @@ void setup() {
 void loop() {
   if (gb.update()) {
     if (gb.buttons.pressed(BTN_C)) showTitle();
-    if (gb.buttons.pressed(BTN_RIGHT)) activeStack++;
-    if (gb.buttons.pressed(BTN_LEFT)) activeStack--;
+    if (gb.buttons.pressed(BTN_RIGHT)) {
+      if (activeStack != 5 && activeStack != 12) {
+        activeStack++;
+      }
+    }
+    if (gb.buttons.pressed(BTN_LEFT)) {
+      if (activeStack != 0 && activeStack != 6) {
+        activeStack--;
+      }
+    }
+    if (gb.buttons.pressed(BTN_DOWN)) {
+      if (activeStack < 2) activeStack += 6;
+      else if (activeStack < 6) activeStack += 7;
+    }
+    if (gb.buttons.pressed(BTN_UP)) {
+      if (activeStack > 7) activeStack -= 7;
+      else if (activeStack > 5) activeStack -= 6;
+    }
     
     // Deck
     drawCard(1, 1, 1 + (1 << 4));
@@ -318,8 +334,8 @@ void drawCursor() {
 byte updatePosition(byte current, byte destination) {
   if (current == destination) return current;
 
-  byte delta = (destination - current) >> 1;
-  if (delta == 0) delta = 1;
+  byte delta = (destination - current) / 3;
+  if (delta == 0 && ((gb.frameCount % 3) == 0)) delta = destination > current ? 1 : -1;
   return current + delta;
 }
 
