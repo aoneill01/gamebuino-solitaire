@@ -2,13 +2,27 @@
 #include <Gamebuino.h>
 #include <EEPROM.h>
 
-#include "card.h"
+#include "deck.h"
 
 Gamebuino gb;
 
+enum GameMode { selecting, drawingCards };
+GameMode mode = selecting;
+
+// Stack that the cursor is currently pointed at.
 byte activeStack = 0;
+// Position of the cursor for animation.
 byte cursorX = 11;
 byte cursorY = 5;
+
+// Animating moving stack of cards.
+byte movingStackX;
+byte movingStackY;
+Card movingStack;
+byte remainingDraws;
+
+Deck stock = Deck();
+Deck talon = Deck();
 
 void setup() {
   gb.begin();
@@ -36,12 +50,25 @@ void loop() {
       if (activeStack > 7) activeStack -= 7;
       else if (activeStack > 5) activeStack -= 6;
     }
+    if (gb.buttons.pressed(BTN_A) && mode == selecting) {
+      if (stock.getCardCount() != 0) {
+        movingStack = stock.removeTopCard();
+        movingStack.flip();
+        movingStackX = 1;
+        movingStackY = 1;
+        remainingDraws = min(2, stock.getCardCount());
+        mode = drawingCards;
+      }
+    }
     
     // Deck
-    drawCard(1, 1, Card(ace, club, false));
+    if (stock.getCardCount() != 0) {
+      drawCard(1, 1, Card(ace, spade, true));
+    }
+    
     // Drawn
-    for (int i = 0; i < 3; i++) {
-      drawCard(13 + i * 2, 1, Card(two, heart, false));
+    for (int i = 0; i < min(3, talon.getCardCount()); i++) {
+      drawCard(13 + i * 2, 1, talon.peekCard(min(3, talon.getCardCount()) - i - 1));
     }
     // Destination
     for (int i = 0; i < 4; i++) {
@@ -55,16 +82,40 @@ void loop() {
       }
     }
 
-    drawCursor();
+    if (mode == selecting) drawCursor();
+    if (mode == drawingCards) {
+      drawCard(movingStackX, movingStackY, movingStack);
+      movingStackX = updatePosition(movingStackX, 17);
+      movingStackY = updatePosition(movingStackY, 1);
+      if (movingStackX == 17 && movingStackY == 1) {
+        
+        talon.addCard(movingStack);
+        if (remainingDraws) {
+          remainingDraws--;
+          movingStack = stock.removeTopCard();
+          movingStack.flip();
+          movingStackX = 1;
+          movingStackY = 1;
+        }
+        else {
+          mode = selecting;
+        }
+      }
+    }
   }
 }
 
 void showTitle() {
   gb.titleScreen(F("Solitaire"));
+  gb.pickRandomSeed();
   gb.battery.show = false;
   activeStack = 0;
   cursorX = 11;
   cursorY = 5;
+  talon = Deck();
+  stock.newDeck();
+  stock.shuffle();
+  mode = selecting;
 }
 
 void drawCard(byte x, byte y, Card card) {
