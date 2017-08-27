@@ -94,7 +94,7 @@ void loop() {
     // Tableau
     for (int i = 0; i < 7; i++) {
       for (int j = 0; j < tableau[i].getCardCount(); j++) {
-        drawCard(tableau[i].x, tableau[i].y + 2 * j, tableau[i].getCard(tableau[i].getCardCount() - i - 1));
+        drawCard(tableau[i].x, tableau[i].y + 2 * j, tableau[i].getCard(tableau[i].getCardCount() - j - 1));
       }
     }
 
