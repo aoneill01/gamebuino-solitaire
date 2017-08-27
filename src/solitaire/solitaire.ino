@@ -2,6 +2,8 @@
 #include <Gamebuino.h>
 #include <EEPROM.h>
 
+#include "card.h"
+
 Gamebuino gb;
 
 byte activeStack = 0;
@@ -36,22 +38,20 @@ void loop() {
     }
     
     // Deck
-    drawCard(1, 1, 1 + (1 << 4));
+    drawCard(1, 1, Card(ace, club, false));
     // Drawn
     for (int i = 0; i < 3; i++) {
-      drawCard(13 + i * 2, 1, 2 + (2 << 4));
+      drawCard(13 + i * 2, 1, Card(two, heart, false));
     }
     // Destination
     for (int i = 0; i < 4; i++) {
-      drawCard(37 + i * 12, 1, 3 + i + (i << 4));
+      drawCard(37 + i * 12, 1, Card(static_cast<Value>(three + i), static_cast<Suit>(i % 4), false));
     }
     
     // Stacks
     for (int i = 0; i < 7; i++) {
       for (int j = 0; j <= i; j++) {
-        byte card = i + 7 + (j << 4);
-        if (i != j) card = card | 1 << 7;
-        drawCard(i * 12 + 1, 2 * j + 17, card);
+        drawCard(i * 12 + 1, 2 * j + 17, Card(static_cast<Value>(seven + i), static_cast<Suit>(j % 4), i != j));
       }
     }
 
@@ -67,10 +67,10 @@ void showTitle() {
   cursorY = 5;
 }
 
-void drawCard(byte x, byte y, byte card) {
+void drawCard(byte x, byte y, Card card) {
   // Fill 
   byte fill = WHITE;
-  if (card & 0x80) fill = GRAY;
+  if (card.isFaceDown()) fill = GRAY;
   gb.display.setColor(fill);
   gb.display.fillRect(x + 1, y + 1, 8, 12);
   
@@ -81,18 +81,20 @@ void drawCard(byte x, byte y, byte card) {
   gb.display.drawFastVLine(x, y + 1, 12);
   gb.display.drawFastVLine(x + 9, y + 1, 12);
 
-  if (card & 0x80) return;
+  if (card.isFaceDown()) return;
 
-  if ((1 << 5) & card) gb.display.setColor(GRAY);
-  drawSuit(x + 2, y + 2, card);
-  drawValue(x + 5, y + 7, card);
+  if (card.isRed()) gb.display.setColor(GRAY);
+  drawSuit(x + 2, y + 2, card.getSuit());
+  drawValue(x + 5, y + 7, card.getValue());
 }
 
-void drawSuit(byte x, byte y, byte card) {
-  if ((card & (3 << 4)) == (0 << 4)) drawSpade(x, y);
-  else if ((card & (3 << 4)) == (1 << 4)) drawClub(x, y);
-  else if ((card & (3 << 4)) == (2 << 4)) drawHeart(x, y);
-  else if ((card & (3 << 4)) == (3 << 4)) drawDiamond(x, y);
+void drawSuit(byte x, byte y, Suit suit) {
+  switch (suit) {
+    case spade: drawSpade(x, y); break;
+    case club: drawClub(x, y); break;
+    case heart: drawHeart(x, y); break;
+    case diamond: drawDiamond(x, y); break;
+  }
 }
 
 void drawHeart(byte x, byte y) {
@@ -128,49 +130,21 @@ void drawClub(byte x, byte y) {
   gb.display.drawFastVLine(x + 2, y + 1, 4);
 }
 
-void drawValue(byte x, byte y, byte card) {
-  switch (0x0f & card) {
-    case 1:
-      drawAce(x, y);
-      break;
-    case 2:
-      drawTwo(x, y);
-      break;
-    case 3:
-      drawThree(x, y);
-      break;
-    case 4:
-      drawFour(x, y);
-      break;
-    case 5:
-      drawFive(x, y);
-      break;
-    case 6:
-      drawSix(x, y);
-      break;
-    case 7:
-      drawSeven(x, y);
-      break;
-    case 8:
-      drawEight(x, y);
-      break;
-    case 9:
-      drawNine(x, y);
-      break;
-    case 10:
-      drawTen(x, y);
-      break;
-    case 11:
-      drawJack(x, y);
-      break;
-    case 12:
-      drawQueen(x, y);
-      break;
-    case 13:
-      drawKing(x, y);
-      break;
-    default:
-      break;
+void drawValue(byte x, byte y, Value value) {
+  switch (value) {
+    case ace: drawAce(x, y); break;
+    case two: drawTwo(x, y); break;
+    case three: drawThree(x, y); break;
+    case four: drawFour(x, y); break;
+    case five: drawFive(x, y); break;
+    case six: drawSix(x, y); break;
+    case seven: drawSeven(x, y); break;
+    case eight: drawEight(x, y); break;
+    case nine: drawNine(x, y); break;
+    case ten: drawTen(x, y); break;
+    case jack: drawJack(x, y); break;
+    case queen: drawQueen(x, y); break;
+    case king: drawKing(x, y); break;
   }
 }
 
