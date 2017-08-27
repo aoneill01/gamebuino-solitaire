@@ -1,5 +1,7 @@
 #include <Gamebuino.h>
 
+#ifndef CARD_H
+#define CARD_H
 enum Suit { spade = 0, club, heart, diamond };
 enum Value { ace = 1, two, three, four, five, six, seven, eight, nine, ten, jack, queen, king };
 
@@ -16,4 +18,4 @@ class Card {
   private:
     byte _value;
 };
-
+#endif

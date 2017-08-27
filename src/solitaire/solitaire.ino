@@ -1,12 +1,12 @@
 #include <SPI.h>
 #include <Gamebuino.h>
 #include <EEPROM.h>
-
 #include "deck.h"
+#include "pile.h"
 
 Gamebuino gb;
 
-enum GameMode { selecting, drawingCards };
+enum GameMode { dealing, selecting, drawingCards };
 GameMode mode = selecting;
 
 // Stack that the cursor is currently pointed at.
@@ -23,6 +23,17 @@ byte remainingDraws;
 
 Deck stock = Deck();
 Deck talon = Deck();
+Pile foundations[4];
+Pile tableau[7];
+
+struct CardAnimation {
+  Card card;
+  byte tableauIndex;
+  byte x, y, destX, destY;
+};
+
+CardAnimation cardAnimations[28];
+byte cardAnimationCount = 0;
 
 void setup() {
   gb.begin();
@@ -32,53 +43,58 @@ void setup() {
 void loop() {
   if (gb.update()) {
     if (gb.buttons.pressed(BTN_C)) showTitle();
-    if (gb.buttons.pressed(BTN_RIGHT)) {
-      if (activeStack != 5 && activeStack != 12) {
-        activeStack++;
+    if (mode == selecting) {
+      if (gb.buttons.pressed(BTN_RIGHT)) {
+        if (activeStack != 5 && activeStack != 12) {
+          activeStack++;
+        }
       }
-    }
-    if (gb.buttons.pressed(BTN_LEFT)) {
-      if (activeStack != 0 && activeStack != 6) {
-        activeStack--;
+      if (gb.buttons.pressed(BTN_LEFT)) {
+        if (activeStack != 0 && activeStack != 6) {
+          activeStack--;
+        }
       }
-    }
-    if (gb.buttons.pressed(BTN_DOWN)) {
-      if (activeStack < 2) activeStack += 6;
-      else if (activeStack < 6) activeStack += 7;
-    }
-    if (gb.buttons.pressed(BTN_UP)) {
-      if (activeStack > 7) activeStack -= 7;
-      else if (activeStack > 5) activeStack -= 6;
-    }
-    if (gb.buttons.pressed(BTN_A) && mode == selecting) {
-      if (stock.getCardCount() != 0) {
-        movingStack = stock.removeTopCard();
-        movingStack.flip();
-        movingStackX = 1;
-        movingStackY = 1;
-        remainingDraws = min(2, stock.getCardCount());
-        mode = drawingCards;
+      if (gb.buttons.pressed(BTN_DOWN)) {
+        if (activeStack < 2) activeStack += 6;
+        else if (activeStack < 6) activeStack += 7;
+      }
+      if (gb.buttons.pressed(BTN_UP)) {
+        if (activeStack > 7) activeStack -= 7;
+        else if (activeStack > 5) activeStack -= 6;
+      }
+      if (gb.buttons.pressed(BTN_A) && mode == selecting) {
+        if (stock.getCardCount() != 0) {
+          movingStack = stock.removeTopCard();
+          movingStack.flip();
+          movingStackX = 1;
+          movingStackY = 1;
+          remainingDraws = min(2, stock.getCardCount());
+          mode = drawingCards;
+        }
       }
     }
     
-    // Deck
+    // Stock
     if (stock.getCardCount() != 0) {
       drawCard(1, 1, Card(ace, spade, true));
     }
     
-    // Drawn
+    // Talon
     for (int i = 0; i < min(3, talon.getCardCount()); i++) {
       drawCard(13 + i * 2, 1, talon.peekCard(min(3, talon.getCardCount()) - i - 1));
     }
-    // Destination
+    
+    // Foundations
     for (int i = 0; i < 4; i++) {
-      drawCard(37 + i * 12, 1, Card(static_cast<Value>(three + i), static_cast<Suit>(i % 4), false));
+      if (foundations[i].getCardCount() != 0) {
+        drawCard(37 + i * 12, 1, foundations[i].getCard(0));
+      }
     }
     
-    // Stacks
+    // Tableau
     for (int i = 0; i < 7; i++) {
-      for (int j = 0; j <= i; j++) {
-        drawCard(i * 12 + 1, 2 * j + 17, Card(static_cast<Value>(seven + i), static_cast<Suit>(j % 4), i != j));
+      for (int j = 0; j < tableau[i].getCardCount(); j++) {
+        drawCard(tableau[i].x, tableau[i].y + 2 * j, tableau[i].getCard(tableau[i].getCardCount() - i - 1));
       }
     }
 
@@ -102,6 +118,22 @@ void loop() {
         }
       }
     }
+    if (mode == dealing) {
+      if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) cardAnimationCount++;
+      bool doneDealing = cardAnimationCount == 28;
+      for (int i = 0; i < cardAnimationCount; i++) {
+        if (cardAnimations[i].x != cardAnimations[i].destX || cardAnimations[i].y != cardAnimations[i].destY) {
+          doneDealing = false;
+          drawCard(cardAnimations[i].x, cardAnimations[i].y, cardAnimations[i].card);
+          cardAnimations[i].x = updatePosition(cardAnimations[i].x, cardAnimations[i].destX);
+          cardAnimations[i].y = updatePosition(cardAnimations[i].y, cardAnimations[i].destY);
+          if (cardAnimations[i].x == cardAnimations[i].destX && cardAnimations[i].y == cardAnimations[i].destY) {
+            tableau[cardAnimations[i].tableauIndex].addCard(cardAnimations[i].card);
+          }
+        }
+      }
+      if (doneDealing) mode = selecting;
+    }
   }
 }
 
@@ -112,10 +144,36 @@ void showTitle() {
   activeStack = 0;
   cursorX = 11;
   cursorY = 5;
+  setupNewGame();
+  mode = dealing;
+}
+
+void setupNewGame() {
   talon = Deck();
   stock.newDeck();
   stock.shuffle();
-  mode = selecting;
+  for (int i = 0; i < 4; i++) foundations[i] = Pile();
+  for (int i = 0; i < 7; i++) {
+    tableau[i] = Pile();
+    tableau[i].x = i * 12 + 1;
+    tableau[i].y = 17;
+  }
+  cardAnimationCount = 0;
+  for (int i = 0; i < 7; i++) {
+    for (int j = i; j < 7; j++) {
+      Card card = stock.removeTopCard();
+      if (i == j) card.flip();
+      cardAnimations[cardAnimationCount] = CardAnimation();
+      cardAnimations[cardAnimationCount].x = 1;
+      cardAnimations[cardAnimationCount].y = 1;
+      cardAnimations[cardAnimationCount].destX = tableau[j].x;
+      cardAnimations[cardAnimationCount].destY = tableau[j].y + 2 * i;
+      cardAnimations[cardAnimationCount].tableauIndex = j;
+      cardAnimations[cardAnimationCount].card = card;
+      cardAnimationCount++;
+    }
+  }
+  cardAnimationCount = 0;
 }
 
 void drawCard(byte x, byte y, Card card) {
