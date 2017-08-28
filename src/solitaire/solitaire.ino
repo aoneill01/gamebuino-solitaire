@@ -6,23 +6,25 @@
 
 Gamebuino gb;
 
-enum GameMode { dealing, selecting, drawingCards };
+enum GameMode { dealing, selecting, drawingCards, movingPile };
 GameMode mode = selecting;
 
+enum Location { stock, talon, 
+  foundation1, foundation2, foundation3, foundation4,
+  tableau1, tableau2, tableau3, tableau4, tableau5, tableau6, tableau7 }; 
 // Stack that the cursor is currently pointed at.
-byte activeStack = 0;
+Location activeLocation = stock;
 // Position of the cursor for animation.
 byte cursorX = 11;
 byte cursorY = 5;
 
 // Animating moving stack of cards.
-byte movingStackX;
-byte movingStackY;
-Card movingStack;
+Pile moving;
+Location returnLocation;
 byte remainingDraws;
 
-Deck stock = Deck();
-Deck talon = Deck();
+Deck stockDeck = Deck();
+Deck talonDeck = Deck();
 Pile foundations[4];
 Pile tableau[7];
 
@@ -43,75 +45,102 @@ void setup() {
 void loop() {
   if (gb.update()) {
     if (gb.buttons.pressed(BTN_C)) showTitle();
-    if (mode == selecting) {
+    if (mode == selecting || mode == movingPile) {
       if (gb.buttons.pressed(BTN_RIGHT)) {
-        if (activeStack != 5 && activeStack != 12) {
-          activeStack++;
+        if (activeLocation != foundation4 && activeLocation != tableau7) {
+          activeLocation = activeLocation + 1;
         }
       }
       if (gb.buttons.pressed(BTN_LEFT)) {
-        if (activeStack != 0 && activeStack != 6) {
-          activeStack--;
+        if (activeLocation != stock && activeLocation != tableau1) {
+          activeLocation = activeLocation - 1;
         }
       }
       if (gb.buttons.pressed(BTN_DOWN)) {
-        if (activeStack < 2) activeStack += 6;
-        else if (activeStack < 6) activeStack += 7;
+        if (activeLocation < foundation1) activeLocation = activeLocation + 6;
+        else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
       }
       if (gb.buttons.pressed(BTN_UP)) {
-        if (activeStack > 7) activeStack -= 7;
-        else if (activeStack > 5) activeStack -= 6;
+        if (activeLocation > tableau2) activeLocation = activeLocation - 7;
+        else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
       }
-      if (gb.buttons.pressed(BTN_A) && mode == selecting) {
-        if (stock.getCardCount() != 0) {
-          movingStack = stock.removeTopCard();
-          movingStack.flip();
-          movingStackX = 1;
-          movingStackY = 1;
-          remainingDraws = min(2, stock.getCardCount());
-          mode = drawingCards;
+      if (gb.buttons.pressed(BTN_A)) {
+        switch (activeLocation) {
+          case stock:
+            if (stockDeck.getCardCount() != 0) {
+              moving = Pile();
+              Card card = stockDeck.removeTopCard();
+              card.flip();
+              moving.addCard(card);
+              moving.x = 1;
+              moving.y = 1;
+              remainingDraws = min(2, stockDeck.getCardCount());
+              mode = drawingCards;
+            }
+            break;
+          case tableau1:
+          case tableau2:
+          case tableau3:
+          case tableau4:
+          case tableau5:
+          case tableau6:
+          case tableau7:
+            if (mode == selecting) {
+              moving = tableau[activeLocation - tableau1].removeCards(1);
+              moving.x = tableau[activeLocation - tableau1].x;
+              moving.y = tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2;
+              mode = movingPile;
+            }
+            else if (mode == movingPile) {
+              tableau[activeLocation - tableau1].addCard(moving.getCard(0));
+              mode = selecting;
+            }
+            break;
         }
       }
     }
     
     // Stock
-    if (stock.getCardCount() != 0) {
+    if (stockDeck.getCardCount() != 0) {
       drawCard(1, 1, Card(ace, spade, true));
     }
     
     // Talon
-    for (int i = 0; i < min(3, talon.getCardCount()); i++) {
-      drawCard(13 + i * 2, 1, talon.peekCard(min(3, talon.getCardCount()) - i - 1));
+    for (int i = 0; i < min(3, talonDeck.getCardCount()); i++) {
+      drawCard(13 + i * 2, 1, talonDeck.peekCard(min(3, talonDeck.getCardCount()) - i - 1));
     }
     
     // Foundations
     for (int i = 0; i < 4; i++) {
       if (foundations[i].getCardCount() != 0) {
-        drawCard(37 + i * 12, 1, foundations[i].getCard(0));
+        drawCard(foundations[i].x, foundations[i].y, foundations[i].getCard(0));
+      }
+      else {
+        gb.display.setColor(GRAY);
+        gb.display.drawRect(foundations[i].x, foundations[i].y, 10, 14);
       }
     }
     
     // Tableau
     for (int i = 0; i < 7; i++) {
-      for (int j = 0; j < tableau[i].getCardCount(); j++) {
-        drawCard(tableau[i].x, tableau[i].y + 2 * j, tableau[i].getCard(tableau[i].getCardCount() - j - 1));
-      }
+      drawPile(&tableau[i]);
     }
 
     if (mode == selecting) drawCursor();
     if (mode == drawingCards) {
-      drawCard(movingStackX, movingStackY, movingStack);
-      movingStackX = updatePosition(movingStackX, 17);
-      movingStackY = updatePosition(movingStackY, 1);
-      if (movingStackX == 17 && movingStackY == 1) {
-        
-        talon.addCard(movingStack);
+      drawPile(&moving);
+      moving.x = updatePosition(moving.x, 17);
+      moving.y = updatePosition(moving.y, 1);
+      if (moving.x == 17 && moving.y == 1) {
+        talonDeck.addCard(moving.getCard(0));
         if (remainingDraws) {
           remainingDraws--;
-          movingStack = stock.removeTopCard();
-          movingStack.flip();
-          movingStackX = 1;
-          movingStackY = 1;
+          moving = Pile();
+          Card card = stockDeck.removeTopCard();
+          card.flip();
+          moving.addCard(card);
+          moving.x = 1;
+          moving.y = 1;
         }
         else {
           mode = selecting;
@@ -134,6 +163,23 @@ void loop() {
       }
       if (doneDealing) mode = selecting;
     }
+    if (mode == movingPile) {
+      gb.display.setColor(GRAY);
+      gb.display.drawRect(moving.x - 1, moving.y - 1, 12, 16);
+      drawPile(&moving);
+      switch (activeLocation) {
+        case tableau1:
+        case tableau2:
+        case tableau3:
+        case tableau4:
+        case tableau5:
+        case tableau6:
+        case tableau7:
+          moving.x = updatePosition(moving.x, tableau[activeLocation - tableau1].x);
+          moving.y = updatePosition(moving.y, tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2);
+          break;
+      }
+    }
   }
 }
 
@@ -141,7 +187,7 @@ void showTitle() {
   gb.titleScreen(F("Solitaire"));
   gb.pickRandomSeed();
   gb.battery.show = false;
-  activeStack = 0;
+  activeLocation = 0;
   cursorX = 11;
   cursorY = 5;
   setupNewGame();
@@ -149,10 +195,14 @@ void showTitle() {
 }
 
 void setupNewGame() {
-  talon = Deck();
-  stock.newDeck();
-  stock.shuffle();
-  for (int i = 0; i < 4; i++) foundations[i] = Pile();
+  talonDeck = Deck();
+  stockDeck.newDeck();
+  stockDeck.shuffle();
+  for (int i = 0; i < 4; i++) {
+    foundations[i] = Pile();
+    foundations[i].x = 37 + i * 12;
+    foundations[i].y = 1;
+  }
   for (int i = 0; i < 7; i++) {
     tableau[i] = Pile();
     tableau[i].x = i * 12 + 1;
@@ -161,7 +211,7 @@ void setupNewGame() {
   cardAnimationCount = 0;
   for (int i = 0; i < 7; i++) {
     for (int j = i; j < 7; j++) {
-      Card card = stock.removeTopCard();
+      Card card = stockDeck.removeTopCard();
       if (i == j) card.flip();
       cardAnimations[cardAnimationCount] = CardAnimation();
       cardAnimations[cardAnimationCount].x = 1;
@@ -174,6 +224,12 @@ void setupNewGame() {
     }
   }
   cardAnimationCount = 0;
+}
+
+void drawPile(Pile* pile) {
+  for (int i = 0; i < pile->getCardCount(); i++) {
+    drawCard(pile->x, pile->y + 2 * i, pile->getCard(pile->getCardCount() - i - 1));
+  }
 }
 
 void drawCard(byte x, byte y, Card card) {
@@ -349,65 +405,47 @@ void drawKing(byte x, byte y) {
 
 void drawCursor() {
   bool flipped = false;
-  switch (activeStack) {
-    case 0:
+  switch (activeLocation) {
+    case stock:
       cursorX = updatePosition(cursorX, 11);
       cursorY = updatePosition(cursorY, 5);
       break;
-    case 1:
+    case talon:
       cursorX = updatePosition(cursorX, 27);
       cursorY = updatePosition(cursorY, 5);
       break;
-    case 2:
+    case foundation1:
       cursorX = updatePosition(cursorX, 30);
       cursorY = updatePosition(cursorY, 5);
       flipped = true;
       break;
-    case 3:
+    case foundation2:
       cursorX = updatePosition(cursorX, 42);
       cursorY = updatePosition(cursorY, 5);
       flipped = true;
       break;
-    case 4:
+    case foundation3:
       cursorX = updatePosition(cursorX, 54);
       cursorY = updatePosition(cursorY, 5);
       flipped = true;
       break;
-    case 5:
+    case foundation4:
       cursorX = updatePosition(cursorX, 66);
       cursorY = updatePosition(cursorY, 5);
       flipped = true;
       break;
-    case 6:
-      cursorX = updatePosition(cursorX, 11);
-      cursorY = updatePosition(cursorY, 21);
+    case tableau1:
+    case tableau2:
+    case tableau3:
+      cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x + 10);
+      cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
       break;
-    case 7:
-      cursorX = updatePosition(cursorX, 23);
-      cursorY = updatePosition(cursorY, 23);
-      break;
-    case 8:
-      cursorX = updatePosition(cursorX, 35);
-      cursorY = updatePosition(cursorY, 25);
-      break;
-    case 9:
-      cursorX = updatePosition(cursorX, 30);
-      cursorY = updatePosition(cursorY, 27);
-      flipped = true;
-      break;
-    case 10:
-      cursorX = updatePosition(cursorX, 42);
-      cursorY = updatePosition(cursorY, 29);
-      flipped = true;
-      break;
-    case 11:
-      cursorX = updatePosition(cursorX, 54);
-      cursorY = updatePosition(cursorY, 31);
-      flipped = true;
-      break;
-    case 12:
-      cursorX = updatePosition(cursorX, 66);
-      cursorY = updatePosition(cursorY, 33);
+    case tableau4:
+    case tableau5:
+    case tableau6:
+    case tableau7:
+      cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x - 7);
+      cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
       flipped = true;
       break;
   }

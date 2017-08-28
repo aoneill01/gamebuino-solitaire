@@ -9,6 +9,7 @@ class Pile {
     void addCard(Card card);
     byte getCardCount() const;
     Card getCard(int indexFromTop) const;
+    Pile removeCards(int count);
     byte x, y;
     
   private:
