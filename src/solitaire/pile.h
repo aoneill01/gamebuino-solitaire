@@ -1,7 +1,7 @@
 #include <Gamebuino.h>
 #include "card.h"
 
-#define MAX_PILE 20
+#define MAX_PILE 52
 
 class Pile {
   public:
@@ -9,7 +9,8 @@ class Pile {
     void addCard(Card card);
     byte getCardCount() const;
     Card getCard(int indexFromTop) const;
-    Pile removeCards(int count);
+    void removeCards(int count, Pile* destination);
+    void empty();
     byte x, y;
     
   private:

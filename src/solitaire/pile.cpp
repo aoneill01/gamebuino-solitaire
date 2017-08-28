@@ -19,11 +19,13 @@ Card Pile::getCard(int indexFromTop) const {
   return Card(two, heart, false);
 }
 
-Pile Pile::removeCards(int count) {
+void Pile::removeCards(int count, Pile* destination) {
   count = min(count, _count);
   _count -= count;
-  Pile result;
-  for (int i = 0; i < count; i++) result.addCard(_cards[_count + i]);
-  return result;
+  for (int i = 0; i < count; i++) destination->addCard(_cards[_count + i]);
+}
+
+void Pile::empty() {
+  _count = 0;
 }
 

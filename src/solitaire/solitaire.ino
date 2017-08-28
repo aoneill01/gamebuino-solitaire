@@ -45,140 +45,19 @@ void setup() {
 void loop() {
   if (gb.update()) {
     if (gb.buttons.pressed(BTN_C)) showTitle();
-    if (mode == selecting || mode == movingPile) {
-      if (gb.buttons.pressed(BTN_RIGHT)) {
-        if (activeLocation != foundation4 && activeLocation != tableau7) {
-          activeLocation = activeLocation + 1;
-        }
-      }
-      if (gb.buttons.pressed(BTN_LEFT)) {
-        if (activeLocation != stock && activeLocation != tableau1) {
-          activeLocation = activeLocation - 1;
-        }
-      }
-      if (gb.buttons.pressed(BTN_DOWN)) {
-        if (activeLocation < foundation1) activeLocation = activeLocation + 6;
-        else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
-      }
-      if (gb.buttons.pressed(BTN_UP)) {
-        if (activeLocation > tableau2) activeLocation = activeLocation - 7;
-        else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
-      }
-      if (gb.buttons.pressed(BTN_A)) {
-        switch (activeLocation) {
-          case stock:
-            if (stockDeck.getCardCount() != 0) {
-              moving = Pile();
-              Card card = stockDeck.removeTopCard();
-              card.flip();
-              moving.addCard(card);
-              moving.x = 1;
-              moving.y = 1;
-              remainingDraws = min(2, stockDeck.getCardCount());
-              mode = drawingCards;
-            }
-            break;
-          case tableau1:
-          case tableau2:
-          case tableau3:
-          case tableau4:
-          case tableau5:
-          case tableau6:
-          case tableau7:
-            if (mode == selecting) {
-              moving = tableau[activeLocation - tableau1].removeCards(1);
-              moving.x = tableau[activeLocation - tableau1].x;
-              moving.y = tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2;
-              mode = movingPile;
-            }
-            else if (mode == movingPile) {
-              tableau[activeLocation - tableau1].addCard(moving.getCard(0));
-              mode = selecting;
-            }
-            break;
-        }
-      }
+    
+    switch (mode) {
+      case selecting: handleSelectingButtons(); break;
+      case movingPile: handleMovingPileButtons(); break;
     }
     
-    // Stock
-    if (stockDeck.getCardCount() != 0) {
-      drawCard(1, 1, Card(ace, spade, true));
-    }
-    
-    // Talon
-    for (int i = 0; i < min(3, talonDeck.getCardCount()); i++) {
-      drawCard(13 + i * 2, 1, talonDeck.peekCard(min(3, talonDeck.getCardCount()) - i - 1));
-    }
-    
-    // Foundations
-    for (int i = 0; i < 4; i++) {
-      if (foundations[i].getCardCount() != 0) {
-        drawCard(foundations[i].x, foundations[i].y, foundations[i].getCard(0));
-      }
-      else {
-        gb.display.setColor(GRAY);
-        gb.display.drawRect(foundations[i].x, foundations[i].y, 10, 14);
-      }
-    }
-    
-    // Tableau
-    for (int i = 0; i < 7; i++) {
-      drawPile(&tableau[i]);
-    }
+    drawBoard();
 
-    if (mode == selecting) drawCursor();
-    if (mode == drawingCards) {
-      drawPile(&moving);
-      moving.x = updatePosition(moving.x, 17);
-      moving.y = updatePosition(moving.y, 1);
-      if (moving.x == 17 && moving.y == 1) {
-        talonDeck.addCard(moving.getCard(0));
-        if (remainingDraws) {
-          remainingDraws--;
-          moving = Pile();
-          Card card = stockDeck.removeTopCard();
-          card.flip();
-          moving.addCard(card);
-          moving.x = 1;
-          moving.y = 1;
-        }
-        else {
-          mode = selecting;
-        }
-      }
-    }
-    if (mode == dealing) {
-      if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) cardAnimationCount++;
-      bool doneDealing = cardAnimationCount == 28;
-      for (int i = 0; i < cardAnimationCount; i++) {
-        if (cardAnimations[i].x != cardAnimations[i].destX || cardAnimations[i].y != cardAnimations[i].destY) {
-          doneDealing = false;
-          drawCard(cardAnimations[i].x, cardAnimations[i].y, cardAnimations[i].card);
-          cardAnimations[i].x = updatePosition(cardAnimations[i].x, cardAnimations[i].destX);
-          cardAnimations[i].y = updatePosition(cardAnimations[i].y, cardAnimations[i].destY);
-          if (cardAnimations[i].x == cardAnimations[i].destX && cardAnimations[i].y == cardAnimations[i].destY) {
-            tableau[cardAnimations[i].tableauIndex].addCard(cardAnimations[i].card);
-          }
-        }
-      }
-      if (doneDealing) mode = selecting;
-    }
-    if (mode == movingPile) {
-      gb.display.setColor(GRAY);
-      gb.display.drawRect(moving.x - 1, moving.y - 1, 12, 16);
-      drawPile(&moving);
-      switch (activeLocation) {
-        case tableau1:
-        case tableau2:
-        case tableau3:
-        case tableau4:
-        case tableau5:
-        case tableau6:
-        case tableau7:
-          moving.x = updatePosition(moving.x, tableau[activeLocation - tableau1].x);
-          moving.y = updatePosition(moving.y, tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2);
-          break;
-      }
+    switch(mode) {
+      case dealing: drawDealing(); break;
+      case selecting: drawCursor(); break;
+      case drawingCards: drawDrawingCards(); break;
+      case movingPile: drawMovingPile(); break;
     }
   }
 }
@@ -224,6 +103,119 @@ void setupNewGame() {
     }
   }
   cardAnimationCount = 0;
+}
+
+void handleSelectingButtons() {
+  if (gb.buttons.pressed(BTN_RIGHT)) {
+    if (activeLocation != foundation4 && activeLocation != tableau7) {
+      activeLocation = activeLocation + 1;
+    }
+  }
+  if (gb.buttons.pressed(BTN_LEFT)) {
+    if (activeLocation != stock && activeLocation != tableau1) {
+      activeLocation = activeLocation - 1;
+    }
+  }
+  if (gb.buttons.pressed(BTN_DOWN)) {
+    if (activeLocation < foundation1) activeLocation = activeLocation + 6;
+    else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
+  }
+  if (gb.buttons.pressed(BTN_UP)) {
+    if (activeLocation > tableau2) activeLocation = activeLocation - 7;
+    else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
+  }
+  if (gb.buttons.pressed(BTN_A)) {
+    switch (activeLocation) {
+      case stock:
+        if (stockDeck.getCardCount() != 0) {
+          moving = Pile();
+          Card card = stockDeck.removeTopCard();
+          card.flip();
+          moving.addCard(card);
+          moving.x = 1;
+          moving.y = 1;
+          remainingDraws = min(2, stockDeck.getCardCount());
+          mode = drawingCards;
+        }
+        break;
+      case tableau1:
+      case tableau2:
+      case tableau3:
+      case tableau4:
+      case tableau5:
+      case tableau6:
+      case tableau7:
+        moving.empty();
+        tableau[activeLocation - tableau1].removeCards(1, &moving);
+        moving.x = tableau[activeLocation - tableau1].x;
+        moving.y = tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2;
+        mode = movingPile;
+        break;
+    }
+  }
+}
+
+void handleMovingPileButtons() {
+  if (gb.buttons.pressed(BTN_RIGHT)) {
+    if (activeLocation != foundation4 && activeLocation != tableau7) {
+      activeLocation = activeLocation + 1;
+    }
+  }
+  if (gb.buttons.pressed(BTN_LEFT)) {
+    if (activeLocation != stock && activeLocation != tableau1) {
+      activeLocation = activeLocation - 1;
+    }
+  }
+  if (gb.buttons.pressed(BTN_DOWN)) {
+    if (activeLocation < foundation1) activeLocation = activeLocation + 6;
+    else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
+  }
+  if (gb.buttons.pressed(BTN_UP)) {
+    if (activeLocation > tableau2) activeLocation = activeLocation - 7;
+    else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
+  }
+  if (gb.buttons.pressed(BTN_A)) {
+    switch (activeLocation) {
+      case tableau1:
+      case tableau2:
+      case tableau3:
+      case tableau4:
+      case tableau5:
+      case tableau6:
+      case tableau7:
+        tableau[activeLocation - tableau1].addCard(moving.getCard(0));
+        mode = selecting;
+        break;
+    }
+  }
+}
+
+void drawBoard() {
+  // Stock
+  if (stockDeck.getCardCount() != 0) {
+    drawCard(1, 1, Card(ace, spade, true));
+  }
+  
+  // Talon
+  for (int i = 0; i < min(3, talonDeck.getCardCount()); i++) {
+    drawCard(13 + i * 2, 1, talonDeck.peekCard(min(3, talonDeck.getCardCount()) - i - 1));
+  }
+  
+  // Foundations
+  for (int i = 0; i < 4; i++) {
+    if (foundations[i].getCardCount() != 0) {
+      drawCard(foundations[i].x, foundations[i].y, foundations[i].getCard(0));
+    }
+    else {
+      gb.display.setColor(GRAY);
+      gb.display.drawRect(foundations[i].x, foundations[i].y, 10, 14);
+    }
+  }
+  
+  // Tableau
+  for (int i = 0; i < 7; i++) {
+    drawPile(&tableau[i]);
+  }
 }
 
 void drawPile(Pile* pile) {
@@ -450,6 +442,60 @@ void drawCursor() {
       break;
   }
   drawCursor(cursorX, cursorY, flipped);
+}
+
+void drawDealing() {
+  if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) cardAnimationCount++;
+  bool doneDealing = cardAnimationCount == 28;
+  for (int i = 0; i < cardAnimationCount; i++) {
+    if (cardAnimations[i].x != cardAnimations[i].destX || cardAnimations[i].y != cardAnimations[i].destY) {
+      doneDealing = false;
+      drawCard(cardAnimations[i].x, cardAnimations[i].y, cardAnimations[i].card);
+      cardAnimations[i].x = updatePosition(cardAnimations[i].x, cardAnimations[i].destX);
+      cardAnimations[i].y = updatePosition(cardAnimations[i].y, cardAnimations[i].destY);
+      if (cardAnimations[i].x == cardAnimations[i].destX && cardAnimations[i].y == cardAnimations[i].destY) {
+        tableau[cardAnimations[i].tableauIndex].addCard(cardAnimations[i].card);
+      }
+    }
+  }
+  if (doneDealing) mode = selecting;
+}
+
+void drawDrawingCards() {
+  drawPile(&moving);
+  moving.x = updatePosition(moving.x, 17);
+  moving.y = updatePosition(moving.y, 1);
+  if (moving.x == 17 && moving.y == 1) {
+    talonDeck.addCard(moving.getCard(0));
+    if (remainingDraws) {
+      remainingDraws--;
+      moving = Pile();
+      Card card = stockDeck.removeTopCard();
+      card.flip();
+      moving.addCard(card);
+      moving.x = 1;
+      moving.y = 1;
+    }
+    else {
+      mode = selecting;
+    }
+  }
+}
+
+void drawMovingPile() {
+  drawPile(&moving);
+  switch (activeLocation) {
+    case tableau1:
+    case tableau2:
+    case tableau3:
+    case tableau4:
+    case tableau5:
+    case tableau6:
+    case tableau7:
+      moving.x = updatePosition(moving.x, tableau[activeLocation - tableau1].x);
+      moving.y = updatePosition(moving.y, tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2);
+      break;
+  }
 }
 
 byte updatePosition(byte current, byte destination) {
