@@ -171,17 +171,17 @@ void handleMovingPileButtons() {
     }
   }
   if (gb.buttons.pressed(BTN_LEFT)) {
-    if (activeLocation != stock && activeLocation != tableau1) {
+    if (activeLocation != talon && activeLocation != tableau1) {
       activeLocation = activeLocation - 1;
     }
   }
   if (gb.buttons.pressed(BTN_DOWN)) {
-    if (activeLocation < foundation1) activeLocation = activeLocation + 6;
-    else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
+    if (activeLocation == talon) activeLocation = tableau2;
+    else if (activeLocation <= foundation3) activeLocation = activeLocation + 7;
   }
   if (gb.buttons.pressed(BTN_UP)) {
-    if (activeLocation > tableau2) activeLocation = activeLocation - 7;
-    else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
+    if (activeLocation >= tableau4) activeLocation = activeLocation - 7;
+    else if (activeLocation >= tableau1) activeLocation = talon;
   }
   if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
@@ -493,7 +493,22 @@ void drawDrawingCards() {
 
 void drawMovingPile() {
   drawPile(&moving);
+  Pile* pile = getActiveLocationPile();
+  moving.x = updatePosition(moving.x, pile->x);
+  moving.y = updatePosition(moving.y, pile->y + 2 * pile->getCardCount() + 2);  
+}
+
+Pile* getActiveLocationPile() {
   switch (activeLocation) {
+    case stock:
+      return &stockDeck;
+    case talon:
+      return &talonDeck;
+    case foundation1:
+    case foundation2:
+    case foundation3:
+    case foundation4:
+      return &foundations[activeLocation - foundation1];
     case tableau1:
     case tableau2:
     case tableau3:
@@ -501,9 +516,7 @@ void drawMovingPile() {
     case tableau5:
     case tableau6:
     case tableau7:
-      moving.x = updatePosition(moving.x, tableau[activeLocation - tableau1].x);
-      moving.y = updatePosition(moving.y, tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2);
-      break;
+      return &tableau[activeLocation - tableau1];
   }
 }
 
