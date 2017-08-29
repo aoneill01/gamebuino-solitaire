@@ -1,7 +1,6 @@
 #include <SPI.h>
 #include <Gamebuino.h>
 #include <EEPROM.h>
-#include "deck.h"
 #include "pile.h"
 
 Gamebuino gb;
@@ -13,25 +12,22 @@ enum Location { stock, talon,
   foundation1, foundation2, foundation3, foundation4,
   tableau1, tableau2, tableau3, tableau4, tableau5, tableau6, tableau7 }; 
 // Stack that the cursor is currently pointed at.
-Location activeLocation = stock;
+Location activeLocation;
 // Position of the cursor for animation.
-byte cursorX = 11;
-byte cursorY = 5;
+byte cursorX, cursorY;
 
 // Animating moving stack of cards.
 Pile moving;
 Location returnLocation;
 byte remainingDraws;
 
-Deck stockDeck = Deck();
-Deck talonDeck = Deck();
+Pile stockDeck, talonDeck;
 Pile foundations[4];
 Pile tableau[7];
 
 struct CardAnimation {
   Card card;
-  byte tableauIndex;
-  byte x, y, destX, destY;
+  byte tableauIndex, x, y, destX, destY;
 };
 
 CardAnimation cardAnimations[28];
@@ -39,6 +35,21 @@ byte cardAnimationCount = 0;
 
 void setup() {
   gb.begin();
+
+  // Initialize positions of piles.
+  for (int i = 0; i < 4; i++) {
+    foundations[i].x = 37 + i * 12;
+    foundations[i].y = 1;
+  }
+  for (int i = 0; i < 7; i++) {
+    tableau[i].x = i * 12 + 1;
+    tableau[i].y = 17;
+  }
+  stockDeck.x = 1;
+  stockDeck.y = 1;
+  talonDeck.x = 13;
+  talonDeck.y = 1;
+  
   showTitle();
 }
 
@@ -66,26 +77,22 @@ void showTitle() {
   gb.titleScreen(F("Solitaire"));
   gb.pickRandomSeed();
   gb.battery.show = false;
-  activeLocation = 0;
-  cursorX = 11;
-  cursorY = 5;
   setupNewGame();
-  mode = dealing;
 }
 
 void setupNewGame() {
-  talonDeck = Deck();
+  activeLocation = stock;
+  cursorX = 11;
+  cursorY = 5;
+
+  talonDeck.empty();
   stockDeck.newDeck();
   stockDeck.shuffle();
   for (int i = 0; i < 4; i++) {
-    foundations[i] = Pile();
-    foundations[i].x = 37 + i * 12;
-    foundations[i].y = 1;
+    foundations[i].empty();
   }
   for (int i = 0; i < 7; i++) {
-    tableau[i] = Pile();
-    tableau[i].x = i * 12 + 1;
-    tableau[i].y = 17;
+    tableau[i].empty();
   }
   cardAnimationCount = 0;
   for (int i = 0; i < 7; i++) {
@@ -103,6 +110,8 @@ void setupNewGame() {
     }
   }
   cardAnimationCount = 0;
+
+  mode = dealing;  
 }
 
 void handleSelectingButtons() {
@@ -193,12 +202,12 @@ void handleMovingPileButtons() {
 void drawBoard() {
   // Stock
   if (stockDeck.getCardCount() != 0) {
-    drawCard(1, 1, Card(ace, spade, true));
+    drawCard(stockDeck.x, stockDeck.y, Card(ace, spade, true));
   }
   
   // Talon
   for (int i = 0; i < min(3, talonDeck.getCardCount()); i++) {
-    drawCard(13 + i * 2, 1, talonDeck.peekCard(min(3, talonDeck.getCardCount()) - i - 1));
+    drawCard(talonDeck.x + i * 2, talonDeck.y, talonDeck.getCard(min(3, talonDeck.getCardCount()) - i - 1));
   }
   
   // Foundations

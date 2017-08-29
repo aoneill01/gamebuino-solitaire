@@ -19,6 +19,11 @@ Card Pile::getCard(int indexFromTop) const {
   return Card(two, heart, false);
 }
 
+Card Pile::removeTopCard() {
+  if (_count > 0) return _cards[--_count];
+  return Card();
+}
+
 void Pile::removeCards(int count, Pile* destination) {
   count = min(count, _count);
   _count -= count;
@@ -29,3 +34,20 @@ void Pile::empty() {
   _count = 0;
 }
 
+void Pile::shuffle() {
+  for (int i = 0; i < _count; i++) {
+    int randomIndex = random(_count - i);
+    Card tmp = _cards[randomIndex];
+    _cards[randomIndex] = _cards[_count - i - 1];
+    _cards[_count - i - 1] = tmp;
+  }
+}
+
+void Pile::newDeck() {
+  empty();
+  for (int suit = spade; suit <= diamond; suit++) {
+    for (int value = ace; value <= king; value++) {
+      addCard(Card(static_cast<Value>(value), static_cast<Suit>(suit), true));
+    }
+  }
+}
