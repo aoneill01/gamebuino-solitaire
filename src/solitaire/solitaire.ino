@@ -147,6 +147,7 @@ void handleSelectingButtons() {
           mode = drawingCards;
         }
         break;
+      case talon:
       case tableau1:
       case tableau2:
       case tableau3:
@@ -154,10 +155,12 @@ void handleSelectingButtons() {
       case tableau5:
       case tableau6:
       case tableau7:
+        Pile* pile = getActiveLocationPile();
+        if (pile->getCardCount() == 0) break;
         moving.empty();
-        tableau[activeLocation - tableau1].removeCards(1, &moving);
-        moving.x = tableau[activeLocation - tableau1].x;
-        moving.y = tableau[activeLocation - tableau1].y + 2 * tableau[activeLocation - tableau1].getCardCount() + 2;
+        pile->removeCards(1, &moving);
+        moving.x = pile->x;
+        moving.y = pile->y + (activeLocation >= tableau1 ? 2 * pile->getCardCount() : 0);
         mode = movingPile;
         break;
     }
@@ -177,7 +180,7 @@ void handleMovingPileButtons() {
   }
   if (gb.buttons.pressed(BTN_DOWN)) {
     if (activeLocation == talon) activeLocation = tableau2;
-    else if (activeLocation <= foundation3) activeLocation = activeLocation + 7;
+    else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
   }
   if (gb.buttons.pressed(BTN_UP)) {
     if (activeLocation >= tableau4) activeLocation = activeLocation - 7;
@@ -185,6 +188,11 @@ void handleMovingPileButtons() {
   }
   if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
+      case talon:
+      case foundation1:
+      case foundation2:
+      case foundation3:
+      case foundation4:
       case tableau1:
       case tableau2:
       case tableau3:
@@ -192,7 +200,7 @@ void handleMovingPileButtons() {
       case tableau5:
       case tableau6:
       case tableau7:
-        tableau[activeLocation - tableau1].addCard(moving.getCard(0));
+        getActiveLocationPile()->addCard(moving.getCard(0));
         mode = selecting;
         break;
     }
@@ -494,8 +502,10 @@ void drawDrawingCards() {
 void drawMovingPile() {
   drawPile(&moving);
   Pile* pile = getActiveLocationPile();
+  byte yDelta = 2;
+  if (activeLocation >= tableau1) yDelta += 2 * pile->getCardCount();
   moving.x = updatePosition(moving.x, pile->x);
-  moving.y = updatePosition(moving.y, pile->y + 2 * pile->getCardCount() + 2);  
+  moving.y = updatePosition(moving.y, pile->y + yDelta);  
 }
 
 Pile* getActiveLocationPile() {
