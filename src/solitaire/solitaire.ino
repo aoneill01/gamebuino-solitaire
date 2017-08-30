@@ -13,6 +13,8 @@ enum Location { stock, talon,
   tableau1, tableau2, tableau3, tableau4, tableau5, tableau6, tableau7 }; 
 // Stack that the cursor is currently pointed at.
 Location activeLocation;
+// Within the stack, card position for the cursor, 0 being top card.
+byte cardIndex;
 // Position of the cursor for animation.
 byte cursorX, cursorY;
 
@@ -115,6 +117,7 @@ void setupNewGame() {
 }
 
 void handleSelectingButtons() {
+  Location originalLocation = activeLocation;
   if (gb.buttons.pressed(BTN_RIGHT)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = activeLocation + 1;
@@ -126,12 +129,27 @@ void handleSelectingButtons() {
     }
   }
   if (gb.buttons.pressed(BTN_DOWN)) {
-    if (activeLocation < foundation1) activeLocation = activeLocation + 6;
-    else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
+    if (cardIndex > 0) {
+      cardIndex--;
+    }
+    else {
+      if (activeLocation < foundation1) activeLocation = activeLocation + 6;
+      else if (activeLocation <= foundation4) activeLocation = activeLocation + 7;
+    }
   }
   if (gb.buttons.pressed(BTN_UP)) {
-    if (activeLocation > tableau2) activeLocation = activeLocation - 7;
-    else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
+    bool interPileNavigation = false;
+    if (activeLocation >= tableau1 && activeLocation <= tableau7) {
+      Pile *pile = getActiveLocationPile();
+      if (pile->getCardCount() > cardIndex + 1 && !pile->getCard(cardIndex + 1).isFaceDown()) {
+        cardIndex++;
+        interPileNavigation = true;
+      }
+    }
+    if (!interPileNavigation) {
+      if (activeLocation > tableau2) activeLocation = activeLocation - 7;
+      else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
+    }
   }
   if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
@@ -146,6 +164,13 @@ void handleSelectingButtons() {
           remainingDraws = min(2, stockDeck.getCardCount());
           mode = drawingCards;
         }
+        else {
+          while (talonDeck.getCardCount() != 0) {
+            Card card = talonDeck.removeTopCard();
+            card.flip();
+            stockDeck.addCard(card);
+          }
+        }
         break;
       case talon:
       case tableau1:
@@ -158,13 +183,14 @@ void handleSelectingButtons() {
         Pile* pile = getActiveLocationPile();
         if (pile->getCardCount() == 0) break;
         moving.empty();
-        pile->removeCards(1, &moving);
+        pile->removeCards(cardIndex + 1, &moving);
         moving.x = pile->x;
         moving.y = pile->y + (activeLocation >= tableau1 ? 2 * pile->getCardCount() : 0);
         mode = movingPile;
         break;
     }
   }
+  if (originalLocation != activeLocation) cardIndex = 0;
 }
 
 void handleMovingPileButtons() {
@@ -200,8 +226,11 @@ void handleMovingPileButtons() {
       case tableau5:
       case tableau6:
       case tableau7:
-        getActiveLocationPile()->addCard(moving.getCard(0));
+        for (int i = moving.getCardCount() - 1; i >= 0; i--) {
+          getActiveLocationPile()->addCard(moving.getCard(i));  
+        }
         mode = selecting;
+        cardIndex = 0;
         break;
     }
   }
@@ -372,13 +401,13 @@ void drawSeven(byte x, byte y) {
 }
 
 void drawEight(byte x, byte y) {
-  drawNine(x, y);
-  drawSegmentE(x, y);
+  drawSix(x, y);
+  drawSegmentB(x, y);
 }
 
 void drawNine(byte x, byte y) {
-  drawFive(x, y);
-  drawSegmentB(x, y);
+  drawFour(x, y);
+  drawSegmentA(x, y);
 }
 
 void drawTen(byte x, byte y) {
@@ -446,16 +475,23 @@ void drawCursor() {
     case tableau1:
     case tableau2:
     case tableau3:
-      cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x + 10);
-      cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
-      break;
     case tableau4:
     case tableau5:
     case tableau6:
     case tableau7:
-      cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x - 7);
-      cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
-      flipped = true;
+      if (activeLocation <= tableau3) {
+        cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x + 10);
+      }
+      else {
+        cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x - 7);
+        flipped = true;
+      }
+      if (cardIndex == 0) {
+        cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
+      }
+      else {
+        cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y - 2 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1 - cardIndex));
+      }
       break;
   }
   drawCursor(cursorX, cursorY, flipped);
