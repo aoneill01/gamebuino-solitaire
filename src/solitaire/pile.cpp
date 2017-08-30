@@ -1,11 +1,17 @@
 #include "pile.h"
  
-Pile::Pile() {
+Pile::Pile(byte maxCards) {
   _count = 0;
+  _maxCards = maxCards;
+  _cards = new Card[_maxCards];
+}
+
+Pile::~Pile() {
+  delete[] _cards;
 }
 
 void Pile::addCard(Card card) {
-  if (_count < MAX_PILE) _cards[_count++] = card;
+  if (_count < _maxCards) _cards[_count++] = card;
 }
 
 byte Pile::getCardCount() const {

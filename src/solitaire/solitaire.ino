@@ -17,13 +17,13 @@ Location activeLocation;
 byte cursorX, cursorY;
 
 // Animating moving stack of cards.
-Pile moving;
+Pile moving = Pile(13);
 Location returnLocation;
 byte remainingDraws;
 
-Pile stockDeck, talonDeck;
-Pile foundations[4];
-Pile tableau[7];
+Pile stockDeck = Pile(52), talonDeck = Pile(52);
+Pile foundations[4] = { Pile(13), Pile(13), Pile(13), Pile(13) };
+Pile tableau[7] = { Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20) };
 
 struct CardAnimation {
   Card card;
@@ -137,7 +137,7 @@ void handleSelectingButtons() {
     switch (activeLocation) {
       case stock:
         if (stockDeck.getCardCount() != 0) {
-          moving = Pile();
+          moving.empty();
           Card card = stockDeck.removeTopCard();
           card.flip();
           moving.addCard(card);
@@ -486,7 +486,7 @@ void drawDrawingCards() {
     talonDeck.addCard(moving.getCard(0));
     if (remainingDraws) {
       remainingDraws--;
-      moving = Pile();
+      moving.empty();
       Card card = stockDeck.removeTopCard();
       card.flip();
       moving.addCard(card);
