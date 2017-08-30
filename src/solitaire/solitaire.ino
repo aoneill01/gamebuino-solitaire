@@ -591,6 +591,18 @@ void drawCursor(byte x, byte y, bool flipped) {
     gb.display.drawPixel(x, y + 3);
     gb.display.setColor(WHITE);
     gb.display.drawFastHLine(x + 1, y + 3, 2);
+    if (cardIndex != 0) {
+      Card card = getActiveLocationPile()->getCard(cardIndex);
+      byte extraWidth = card.getValue() == ten ? 2 : 0;
+      gb.display.setColor(BLACK);
+      gb.display.drawRect(x - 12 - extraWidth, y - 1, 13 + extraWidth, 9);
+      gb.display.setColor(WHITE);
+      gb.display.drawPixel(x, y + 3);
+      gb.display.fillRect(x - 11 - extraWidth, y, 11 + extraWidth, 7);
+      gb.display.setColor(card.isRed() ? GRAY : BLACK);
+      drawValue(x - 10, y + 1, card.getValue());
+      drawSuit(x - 6, y + 1, card.getSuit());
+    }
   }
   else {
     for (int i = 0; i < 4; i++) {
@@ -608,6 +620,18 @@ void drawCursor(byte x, byte y, bool flipped) {
     gb.display.drawPixel(x + 6, y + 3);
     gb.display.setColor(WHITE);
     gb.display.drawFastHLine(x + 4, y + 3, 2);
+    if (cardIndex != 0) {
+      Card card = getActiveLocationPile()->getCard(cardIndex);
+      byte extraWidth = card.getValue() == ten ? 2 : 0;
+      gb.display.setColor(BLACK);
+      gb.display.drawRect(x + 6, y - 1, 13 + extraWidth, 9);
+      gb.display.setColor(WHITE);
+      gb.display.drawPixel(x + 6, y + 3);
+      gb.display.fillRect(x + 7, y, 11 + extraWidth, 7);
+      gb.display.setColor(card.isRed() ? GRAY : BLACK);
+      drawValue(x + 8 + extraWidth, y + 1, card.getValue());
+      drawSuit(x + 12 + extraWidth, y + 1, card.getSuit());
+    }
   }
 }
 
