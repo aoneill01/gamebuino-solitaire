@@ -14,6 +14,12 @@ void Pile::addCard(Card card) {
   if (_count < _maxCards) _cards[_count++] = card;
 }
 
+void Pile::addPile(Pile *pile) {
+  for (int i = pile->getCardCount() - 1; i >= 0; i--) {
+    addCard(pile->getCard(i));  
+  }
+}
+
 byte Pile::getCardCount() const {
   return _count;
 }

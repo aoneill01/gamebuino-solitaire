@@ -5,7 +5,7 @@
 
 Gamebuino gb;
 
-enum GameMode { dealing, selecting, drawingCards, movingPile };
+enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove };
 GameMode mode = selecting;
 
 enum Location { stock, talon, 
@@ -22,6 +22,9 @@ byte cursorX, cursorY;
 Pile moving = Pile(13);
 Location returnLocation;
 byte remainingDraws;
+
+// Keep track of source pile for returning invalid moves.
+Pile *sourcePile;
 
 Pile stockDeck = Pile(52), talonDeck = Pile(52);
 Pile foundations[4] = { Pile(13), Pile(13), Pile(13), Pile(13) };
@@ -42,15 +45,19 @@ void setup() {
   for (int i = 0; i < 4; i++) {
     foundations[i].x = 37 + i * 12;
     foundations[i].y = 1;
+    foundations[i].isTableau = false;
   }
   for (int i = 0; i < 7; i++) {
     tableau[i].x = i * 12 + 1;
     tableau[i].y = 17;
+    tableau[i].isTableau = true;
   }
   stockDeck.x = 1;
   stockDeck.y = 1;
+  stockDeck.isTableau = false;
   talonDeck.x = 13;
   talonDeck.y = 1;
+  stockDeck.isTableau = false;
   
   showTitle();
 }
@@ -71,6 +78,7 @@ void loop() {
       case selecting: drawCursor(); break;
       case drawingCards: drawDrawingCards(); break;
       case movingPile: drawMovingPile(); break;
+      case illegalMove: drawIllegalMove(); break;
     }
   }
 }
@@ -180,12 +188,12 @@ void handleSelectingButtons() {
       case tableau5:
       case tableau6:
       case tableau7:
-        Pile* pile = getActiveLocationPile();
-        if (pile->getCardCount() == 0) break;
+        sourcePile = getActiveLocationPile();
+        if (sourcePile->getCardCount() == 0) break;
         moving.empty();
-        pile->removeCards(cardIndex + 1, &moving);
-        moving.x = pile->x;
-        moving.y = pile->y + (activeLocation >= tableau1 ? 2 * pile->getCardCount() : 0);
+        sourcePile->removeCards(cardIndex + 1, &moving);
+        moving.x = sourcePile->x;
+        moving.y = sourcePile->y + (activeLocation >= tableau1 ? 2 * sourcePile->getCardCount() : 0);
         mode = movingPile;
         break;
     }
@@ -215,10 +223,35 @@ void handleMovingPileButtons() {
   if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
       case talon:
+        mode = illegalMove;
+        break;
       case foundation1:
       case foundation2:
       case foundation3:
       case foundation4:
+        {
+          if (moving.getCardCount() != 1) {
+            mode = illegalMove;
+            break;
+          }
+          Pile *destinationFoundation = getActiveLocationPile();
+          if (destinationFoundation->getCardCount() == 0) {
+            if (moving.getCard(0).getValue() != ace) {
+              mode = illegalMove;
+              break;
+            }
+          }
+          else {
+            Card card1 = destinationFoundation->getCard(0);
+            Card card2 = moving.getCard(0);
+            if (card1.getSuit() != card2.getSuit() || card1.getValue() + 1 != card2.getValue()) {
+              mode = illegalMove;
+              break;
+            }
+          }
+          moveCards();
+        }
+        break;
       case tableau1:
       case tableau2:
       case tableau3:
@@ -226,13 +259,33 @@ void handleMovingPileButtons() {
       case tableau5:
       case tableau6:
       case tableau7:
-        for (int i = moving.getCardCount() - 1; i >= 0; i--) {
-          getActiveLocationPile()->addCard(moving.getCard(i));  
+        {
+          Pile *destinationTableau = getActiveLocationPile();
+          if (destinationTableau->getCardCount() > 0) {
+            Card card1 = destinationTableau->getCard(0);
+            Card card2 = moving.getCard(moving.getCardCount() - 1);
+            if (card1.isRed() == card2.isRed() || card1.getValue() != card2.getValue() + 1) {
+              mode = illegalMove;
+              break;
+            }
+          }
         }
-        mode = selecting;
-        cardIndex = 0;
+        moveCards();
         break;
     }
+  }
+}
+
+void moveCards() {
+  getActiveLocationPile()->addPile(&moving);
+  mode = selecting;
+  cardIndex = 0;
+  // Check for cards to reveal.
+  for (int i = 0; i < 7; i++) {
+    if (tableau[i].getCardCount() == 0) continue;
+    Card card = tableau[i].removeTopCard();
+    if (card.isFaceDown()) card.flip();
+    tableau[i].addCard(card);
   }
 }
 
@@ -449,7 +502,7 @@ void drawCursor() {
       cursorY = updatePosition(cursorY, 5);
       break;
     case talon:
-      cursorX = updatePosition(cursorX, 27);
+      cursorX = updatePosition(cursorX, 23 + 2 * min(2, max(0, talonDeck.getCardCount() - 1)));
       cursorY = updatePosition(cursorY, 5);
       break;
     case foundation1:
@@ -539,9 +592,22 @@ void drawMovingPile() {
   drawPile(&moving);
   Pile* pile = getActiveLocationPile();
   byte yDelta = 2;
-  if (activeLocation >= tableau1) yDelta += 2 * pile->getCardCount();
+  if (pile->isTableau) yDelta += 2 * pile->getCardCount();
   moving.x = updatePosition(moving.x, pile->x);
   moving.y = updatePosition(moving.y, pile->y + yDelta);  
+}
+
+void drawIllegalMove() {
+  byte yDelta = 0;
+  if (sourcePile->isTableau) yDelta += 2 * sourcePile->getCardCount();
+  moving.x = updatePosition(moving.x, sourcePile->x);
+  moving.y = updatePosition(moving.y, sourcePile->y + yDelta); 
+  drawPile(&moving);
+  if (moving.x == sourcePile->x && moving.y == sourcePile->y + yDelta) {
+    sourcePile->addPile(&moving);
+    mode = selecting;
+    cardIndex = 0;
+  }
 }
 
 Pile* getActiveLocationPile() {

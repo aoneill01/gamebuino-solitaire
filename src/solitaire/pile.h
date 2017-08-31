@@ -6,6 +6,7 @@ class Pile {
     Pile(byte maxCards);
     ~Pile();
     void addCard(Card card);
+    void addPile(Pile *pile);
     byte getCardCount() const;
     Card getCard(int indexFromTop) const;
     Card removeTopCard();
@@ -14,6 +15,7 @@ class Pile {
     void shuffle();
     void newDeck();
     byte x, y;
+    bool isTableau;
     
   private:
     Card *_cards;
