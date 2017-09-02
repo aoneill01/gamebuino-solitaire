@@ -1,7 +1,5 @@
 # gamebuino-solitaire
 
-In progress...
-
 Solitaire game for [Gamebuino](http://gamebuino.com).
 
 ![Screenshot](src/images/sim.gif?raw=true)
