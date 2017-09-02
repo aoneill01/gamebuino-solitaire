@@ -5,7 +5,7 @@
 
 Gamebuino gb;
 
-enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove };
+enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, wonGame };
 GameMode mode = selecting;
 
 enum Location { stock, talon, 
@@ -37,6 +37,14 @@ struct CardAnimation {
 
 CardAnimation cardAnimations[28];
 byte cardAnimationCount = 0;
+
+struct CardBounce {
+  Card card;
+  int x, y, xVelocity, yVelocity;
+};
+
+CardBounce bounce;
+byte bounceIndex;
 
 void setup() {
   gb.begin();
@@ -71,19 +79,23 @@ void loop() {
       case movingPile: handleMovingPileButtons(); break;
     }
     
-    drawBoard();
-
+    if (mode != wonGame) {
+      drawBoard();      
+    }
+    
     switch(mode) {
       case dealing: drawDealing(); break;
       case selecting: drawCursor(); break;
       case drawingCards: drawDrawingCards(); break;
       case movingPile: drawMovingPile(); break;
       case illegalMove: drawIllegalMove(); break;
+      case wonGame: drawWonGame(); break;
     }
   }
 }
 
 void showTitle() {
+  gb.display.persistence = true;
   gb.titleScreen(F("Solitaire"));
   gb.pickRandomSeed();
   gb.battery.show = false;
@@ -92,6 +104,7 @@ void showTitle() {
 
 void setupNewGame() {
   activeLocation = stock;
+  cardIndex = 0;
   cursorX = 11;
   cursorY = 5;
 
@@ -121,7 +134,7 @@ void setupNewGame() {
   }
   cardAnimationCount = 0;
 
-  mode = dealing;  
+  mode = dealing; 
 }
 
 void handleSelectingButtons() {
@@ -159,6 +172,36 @@ void handleSelectingButtons() {
       else if (activeLocation >= tableau1) activeLocation = activeLocation - 6;
     }
   }
+  if (gb.buttons.pressed(BTN_B)) {
+    if (activeLocation >= tableau1 || activeLocation == talon) {
+      Pile *pile = getActiveLocationPile();
+      if (pile->getCardCount() > 0) {
+        Card card = pile->getCard(0);
+        bool foundMatch = false;
+        for (int i = 0; i < 4; i++) {
+          if (foundations[i].getCardCount() == 0 && card.getValue() == ace) {
+            foundMatch = true;
+          }
+          else {
+            Card card1 = foundations[i].getCard(0);
+            Card card2 = pile->getCard(0);
+            if (card1.getSuit() == card2.getSuit() && card1.getValue() + 1 == card2.getValue()) {
+              foundMatch = true;
+            }
+          }
+          if (foundMatch) {
+            moving.empty();
+            moving.addCard(pile->removeTopCard());
+            moving.x = pile->x;
+            moving.y = pile->y + (activeLocation >= tableau1 ? 2 * sourcePile->getCardCount() : 0);
+            sourcePile = &foundations[i];
+            mode = illegalMove;
+            break;
+          }
+        }
+      }
+    }
+  }
   if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
       case stock:
@@ -169,7 +212,7 @@ void handleSelectingButtons() {
           moving.addCard(card);
           moving.x = 1;
           moving.y = 1;
-          remainingDraws = min(2, stockDeck.getCardCount());
+          remainingDraws = min(0, stockDeck.getCardCount()); // 2
           mode = drawingCards;
         }
         else {
@@ -250,6 +293,7 @@ void handleMovingPileButtons() {
             }
           }
           moveCards();
+          checkWonGame();
         }
         break;
       case tableau1:
@@ -262,9 +306,18 @@ void handleMovingPileButtons() {
         {
           Pile *destinationTableau = getActiveLocationPile();
           if (destinationTableau->getCardCount() > 0) {
+            // Make sure that it is a decending value, alternating color.
             Card card1 = destinationTableau->getCard(0);
             Card card2 = moving.getCard(moving.getCardCount() - 1);
             if (card1.isRed() == card2.isRed() || card1.getValue() != card2.getValue() + 1) {
+              mode = illegalMove;
+              break;
+            }
+          }
+          else {
+            // You can only place kings in an empty tableau.
+            Card card = moving.getCard(moving.getCardCount() - 1);
+            if (card.getValue() != king) {
               mode = illegalMove;
               break;
             }
@@ -280,12 +333,23 @@ void moveCards() {
   getActiveLocationPile()->addPile(&moving);
   mode = selecting;
   cardIndex = 0;
+  revealCards();
+}
+
+void revealCards() {
   // Check for cards to reveal.
   for (int i = 0; i < 7; i++) {
     if (tableau[i].getCardCount() == 0) continue;
     Card card = tableau[i].removeTopCard();
     if (card.isFaceDown()) card.flip();
     tableau[i].addCard(card);
+  }
+}
+
+void checkWonGame() {
+  if (foundations[0].getCardCount() == 13 && foundations[1].getCardCount() == 13 &&
+    foundations[2].getCardCount() == 13 && foundations[3].getCardCount() == 13) {
+      mode = wonGame;
   }
 }
 
@@ -607,7 +671,40 @@ void drawIllegalMove() {
     sourcePile->addPile(&moving);
     mode = selecting;
     cardIndex = 0;
+    revealCards();
+    checkWonGame();
   }
+}
+
+void drawWonGame() {
+  if (!gb.display.persistence) {
+    gb.display.persistence = true;
+    drawBoard();
+    initializeCardBounce();
+  }
+
+  bounce.yVelocity += 0x0080;
+  bounce.x += bounce.xVelocity;
+  bounce.y += bounce.yVelocity;
+  if (bounce.y + (14 << 8) > LCDHEIGHT << 8) {
+    bounce.y = (LCDHEIGHT - 14) << 8;
+    bounce.yVelocity = bounce.yVelocity * -4 / 5;
+  }
+  drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
+  if (bounce.x + (10 << 8) < 0 || bounce.x > LCDWIDTH << 8) {
+    if (!initializeCardBounce()) showTitle();
+  }
+}
+
+bool initializeCardBounce() {
+  if (foundations[bounceIndex].getCardCount() == 0) return false;
+  bounce.card = foundations[bounceIndex].removeTopCard();
+  bounce.x = foundations[bounceIndex].x << 8;
+  bounce.y = foundations[bounceIndex].y << 8;
+  bounce.xVelocity = (random(2) ? 1 : -1) * random(0x0100, 0x0200);
+  bounce.yVelocity = -1 * random(0x0200);
+  bounceIndex = (bounceIndex + 1) % 4;
+  return true;
 }
 
 Pile* getActiveLocationPile() {
