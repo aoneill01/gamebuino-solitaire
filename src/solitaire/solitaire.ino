@@ -3,11 +3,18 @@
 #include <EEPROM.h>
 #include "pile.h"
 
+#define MAX_CARDS_DRAWN_IN_PILE 10
+
 Gamebuino gb;
 
 enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, wonGame };
+// State of the game.
 GameMode mode = selecting;
 
+// Stock: where you draw cards from
+// Talon: drawn cards
+// Foundation: get the cards here in suit order to win
+// Tableau: alternating colors, descending order
 enum Location { stock, talon, 
   foundation1, foundation2, foundation3, foundation4,
   tableau1, tableau2, tableau3, tableau4, tableau5, tableau6, tableau7 }; 
@@ -22,6 +29,8 @@ byte cursorX, cursorY;
 Pile moving = Pile(13);
 Location returnLocation;
 byte remainingDraws;
+// 3 at a time for hard, 1 at a time for easy
+byte cardsToDraw;
 
 // Keep track of source pile for returning invalid moves.
 Pile *sourcePile;
@@ -35,6 +44,7 @@ struct CardAnimation {
   byte tableauIndex, x, y, destX, destY;
 };
 
+// Used to deal at the start of the game.
 CardAnimation cardAnimations[28];
 byte cardAnimationCount = 0;
 
@@ -43,8 +53,16 @@ struct CardBounce {
   int x, y, xVelocity, yVelocity;
 };
 
+// Keeps track of a bouncing card for the winning animation.
 CardBounce bounce;
 byte bounceIndex;
+
+const char easy[] PROGMEM = "Easy";
+const char hard[] PROGMEM = "Hard";
+const char* const menu[2] PROGMEM = {
+  easy,
+  hard,
+};
 
 void setup() {
   gb.begin();
@@ -71,18 +89,23 @@ void setup() {
 }
 
 void loop() {
+  // Main loop.
   if (gb.update()) {
+    // Exit to title whenever C is pressed.
     if (gb.buttons.pressed(BTN_C)) showTitle();
     
+    // Handle key presses for various modes.
     switch (mode) {
       case selecting: handleSelectingButtons(); break;
       case movingPile: handleMovingPileButtons(); break;
     }
     
+    // Draw the board.
     if (mode != wonGame) {
       drawBoard();      
     }
     
+    // Draw other things based on the current state of the game.
     switch(mode) {
       case dealing: drawDealing(); break;
       case selecting: drawCursor(); break;
@@ -100,6 +123,13 @@ void showTitle() {
   gb.pickRandomSeed();
   gb.battery.show = false;
   setupNewGame();
+
+  // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
+  byte menuOption;
+  do {
+    menuOption = gb.menu(menu, 2);
+  } while (menuOption == -1);
+  cardsToDraw = menuOption == 0 ? 1 : 3;
 }
 
 void setupNewGame() {
@@ -117,6 +147,8 @@ void setupNewGame() {
   for (int i = 0; i < 7; i++) {
     tableau[i].empty();
   }
+
+  // Initialize the data structure to deal out the initial board.
   cardAnimationCount = 0;
   for (int i = 0; i < 7; i++) {
     for (int j = i; j < 7; j++) {
@@ -138,6 +170,7 @@ void setupNewGame() {
 }
 
 void handleSelectingButtons() {
+  // Handle buttons when user is using the arrow cursor to navigate.
   Location originalLocation = activeLocation;
   if (gb.buttons.pressed(BTN_RIGHT)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
@@ -191,9 +224,9 @@ void handleSelectingButtons() {
           }
           if (foundMatch) {
             moving.empty();
-            moving.addCard(pile->removeTopCard());
             moving.x = pile->x;
-            moving.y = pile->y + (activeLocation >= tableau1 ? 2 * sourcePile->getCardCount() : 0);
+            moving.y = cardYPosition(pile, 0);
+            moving.addCard(pile->removeTopCard());
             sourcePile = &foundations[i];
             mode = illegalMove;
             break;
@@ -212,7 +245,7 @@ void handleSelectingButtons() {
           moving.addCard(card);
           moving.x = 1;
           moving.y = 1;
-          remainingDraws = min(0, stockDeck.getCardCount()); // 2
+          remainingDraws = min(cardsToDraw - 1, stockDeck.getCardCount()); 
           mode = drawingCards;
         }
         else {
@@ -234,9 +267,9 @@ void handleSelectingButtons() {
         sourcePile = getActiveLocationPile();
         if (sourcePile->getCardCount() == 0) break;
         moving.empty();
-        sourcePile->removeCards(cardIndex + 1, &moving);
         moving.x = sourcePile->x;
-        moving.y = sourcePile->y + (activeLocation >= tableau1 ? 2 * sourcePile->getCardCount() : 0);
+        moving.y = cardYPosition(sourcePile, 0);
+        sourcePile->removeCards(cardIndex + 1, &moving);
         mode = movingPile;
         break;
     }
@@ -245,6 +278,7 @@ void handleSelectingButtons() {
 }
 
 void handleMovingPileButtons() {
+  // Handle buttons when user is moving a pile of cards.
   if (gb.buttons.pressed(BTN_RIGHT)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = activeLocation + 1;
@@ -332,8 +366,13 @@ void handleMovingPileButtons() {
 void moveCards() {
   getActiveLocationPile()->addPile(&moving);
   mode = selecting;
-  cardIndex = 0;
+  updateAfterPlay();
+}
+
+void updateAfterPlay() {
   revealCards();
+  checkWonGame();
+  cardIndex = 0;
 }
 
 void revealCards() {
@@ -347,6 +386,7 @@ void revealCards() {
 }
 
 void checkWonGame() {
+  // Check to see if all foundations are full
   if (foundations[0].getCardCount() == 13 && foundations[1].getCardCount() == 13 &&
     foundations[2].getCardCount() == 13 && foundations[3].getCardCount() == 13) {
       mode = wonGame;
@@ -382,9 +422,19 @@ void drawBoard() {
 }
 
 void drawPile(Pile* pile) {
-  for (int i = 0; i < pile->getCardCount(); i++) {
-    drawCard(pile->x, pile->y + 2 * i, pile->getCard(pile->getCardCount() - i - 1));
+  int baseIndex = max(0, pile->getCardCount() - MAX_CARDS_DRAWN_IN_PILE);
+  for (int i = 0; i < min(pile->getCardCount(), MAX_CARDS_DRAWN_IN_PILE); i++) {
+    drawCard(pile->x, pile->y + 2 * i, pile->getCard(pile->getCardCount() - i - 1 - baseIndex));
   }
+}
+
+byte cardYPosition(Pile *pile, byte cardIndex) {
+  if (pile->isTableau) {
+    if (cardIndex > MAX_CARDS_DRAWN_IN_PILE - 1) return pile->y;
+    return pile->y + 2 * (min(pile->getCardCount(), MAX_CARDS_DRAWN_IN_PILE) - cardIndex - 1);
+  }
+
+  return pile->y;
 }
 
 void drawCard(byte x, byte y, Card card) {
@@ -604,10 +654,10 @@ void drawCursor() {
         flipped = true;
       }
       if (cardIndex == 0) {
-        cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y + 4 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1));
+        cursorY = updatePosition(cursorY, 4 + cardYPosition(getActiveLocationPile(), cardIndex));
       }
       else {
-        cursorY = updatePosition(cursorY, tableau[activeLocation - tableau1].y - 2 + 2 * (tableau[activeLocation - tableau1].getCardCount() - 1 - cardIndex));
+        cursorY = updatePosition(cursorY, -2 + cardYPosition(getActiveLocationPile(), cardIndex));
       }
       break;
   }
@@ -662,42 +712,48 @@ void drawMovingPile() {
 }
 
 void drawIllegalMove() {
+  // Move the cards back to the source pile.
   byte yDelta = 0;
   if (sourcePile->isTableau) yDelta += 2 * sourcePile->getCardCount();
   moving.x = updatePosition(moving.x, sourcePile->x);
   moving.y = updatePosition(moving.y, sourcePile->y + yDelta); 
   drawPile(&moving);
+  // Check to see if the animation is done
   if (moving.x == sourcePile->x && moving.y == sourcePile->y + yDelta) {
     sourcePile->addPile(&moving);
     mode = selecting;
-    cardIndex = 0;
-    revealCards();
-    checkWonGame();
+    updateAfterPlay();
   }
 }
 
 void drawWonGame() {
+  // Bounce the cards from the foundations, one at a time.
   if (!gb.display.persistence) {
     gb.display.persistence = true;
     drawBoard();
     initializeCardBounce();
   }
 
+  // Apply gravity
   bounce.yVelocity += 0x0080;
   bounce.x += bounce.xVelocity;
   bounce.y += bounce.yVelocity;
+  // If the card is at the bottom of the screen, reverse the y velocity and scale by 80%.
   if (bounce.y + (14 << 8) > LCDHEIGHT << 8) {
     bounce.y = (LCDHEIGHT - 14) << 8;
     bounce.yVelocity = bounce.yVelocity * -4 / 5;
   }
   drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
+  // Check to see if the current card is off the screen.
   if (bounce.x + (10 << 8) < 0 || bounce.x > LCDWIDTH << 8) {
     if (!initializeCardBounce()) showTitle();
   }
 }
 
 bool initializeCardBounce() {
+  // Return false if all the cards are done.
   if (foundations[bounceIndex].getCardCount() == 0) return false;
+  // Pick the next card to animate, with a random initial velocity.
   bounce.card = foundations[bounceIndex].removeTopCard();
   bounce.x = foundations[bounceIndex].x << 8;
   bounce.y = foundations[bounceIndex].y << 8;
