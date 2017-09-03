@@ -64,25 +64,64 @@ const char* const menu[2] PROGMEM = {
   hard,
 };
 
+const byte title[] PROGMEM = {64,36,
+0x0,0x0,0x80,0x0,0x1,0x24,0x0,0x0,
+0x0,0x84,0x80,0x0,0x1,0x4,0x0,0x0,
+0x0,0x88,0x80,0x0,0x1,0x4,0x0,0x0,
+0x0,0x90,0x8F,0x16,0x1D,0x24,0xCE,0x0,
+0x0,0xA0,0x99,0x99,0x33,0x25,0x99,0x0,
+0x0,0xC0,0x90,0x91,0x21,0x25,0x11,0x0,
+0x0,0xA0,0x90,0x91,0x21,0x26,0x1F,0x0,
+0x0,0x90,0x90,0x91,0x21,0x25,0x10,0x0,
+0x0,0x88,0x99,0x91,0x33,0x25,0x98,0x0,
+0x0,0x84,0x8F,0x11,0x1D,0x24,0xCF,0x0,
+0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+0x0,0x10,0x1C,0x70,0xE,0x0,0x10,0x0,
+0x0,0x10,0x3E,0xF8,0x3F,0x80,0x10,0x0,
+0x0,0x38,0x3E,0xF8,0x3F,0x80,0x38,0x0,
+0x0,0x7C,0x3F,0xF8,0x3F,0x80,0x7C,0x0,
+0x0,0xFE,0x3F,0xF9,0xDF,0x70,0xFE,0x0,
+0x1,0xFF,0x1F,0xF3,0xFF,0xF9,0xFF,0x0,
+0x3,0xFF,0x8F,0xF3,0xFF,0xFB,0xFF,0x80,
+0x3,0xFF,0x8F,0xE3,0xFF,0xF9,0xFF,0x0,
+0x3,0xFF,0x87,0xC3,0xF5,0xF8,0xFE,0x0,
+0x1,0xD7,0x3,0x81,0xE4,0xF0,0x7C,0x0,
+0x0,0x10,0x3,0x80,0x4,0x0,0x38,0x0,
+0x0,0x38,0x1,0x0,0xE,0x0,0x10,0x0,
+0x0,0xFE,0x1,0x0,0x3F,0x80,0x10,0x0,
+0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+0x0,0x0,0x0,0x90,0x0,0x40,0x0,0x0,
+0x0,0x3C,0x0,0x82,0x0,0x0,0x0,0x0,
+0x0,0x44,0x0,0x82,0x0,0x0,0x0,0x0,
+0x0,0x40,0x78,0x97,0x9C,0x4B,0x38,0x0,
+0x0,0x60,0xCC,0x92,0x2,0x4C,0x64,0x0,
+0x0,0x18,0x84,0x92,0x2,0x48,0x44,0x0,
+0x0,0xC,0x84,0x92,0x1E,0x48,0x7C,0x0,
+0x0,0x4,0x84,0x92,0x22,0x48,0x40,0x0,
+0x0,0x44,0xCC,0x92,0x22,0x48,0x60,0x0,
+0x0,0x78,0x78,0x93,0x9E,0x48,0x3C,0x0,
+};
+
 void setup() {
   gb.begin();
 
   // Initialize positions of piles.
   for (int i = 0; i < 4; i++) {
     foundations[i].x = 37 + i * 12;
-    foundations[i].y = 1;
+    foundations[i].y = 0;
     foundations[i].isTableau = false;
   }
   for (int i = 0; i < 7; i++) {
     tableau[i].x = i * 12 + 1;
-    tableau[i].y = 17;
+    tableau[i].y = 16;
     tableau[i].isTableau = true;
   }
   stockDeck.x = 1;
-  stockDeck.y = 1;
+  stockDeck.y = 0;
   stockDeck.isTableau = false;
   talonDeck.x = 13;
-  talonDeck.y = 1;
+  talonDeck.y = 0;
   stockDeck.isTableau = false;
   
   showTitle();
@@ -119,7 +158,7 @@ void loop() {
 
 void showTitle() {
   gb.display.persistence = true;
-  gb.titleScreen(F("Solitaire"));
+  gb.titleScreen(F(""), title);
   gb.pickRandomSeed();
   gb.battery.show = false;
   setupNewGame();
@@ -156,7 +195,7 @@ void setupNewGame() {
       if (i == j) card.flip();
       cardAnimations[cardAnimationCount] = CardAnimation();
       cardAnimations[cardAnimationCount].x = 1;
-      cardAnimations[cardAnimationCount].y = 1;
+      cardAnimations[cardAnimationCount].y = 0;
       cardAnimations[cardAnimationCount].destX = tableau[j].x;
       cardAnimations[cardAnimationCount].destY = tableau[j].y + 2 * i;
       cardAnimations[cardAnimationCount].tableauIndex = j;
@@ -167,7 +206,21 @@ void setupNewGame() {
   cardAnimationCount = 0;
 
   mode = dealing; 
+
+  // For debugging winning animation
+  /*
+  stockDeck.empty();
+  for (int suit = spade; suit <= diamond; suit++) {
+    for (int value = ace; value <= king; value++) {
+      foundations[suit].addCard(Card(static_cast<Value>(value), static_cast<Suit>(suit), false));
+    }
+  }
+  mode = wonGame;
+  */
 }
+
+const uint16_t patternA[] PROGMEM = {0x0045, 0x0118, 0x0000};
+const uint16_t patternB[] PROGMEM = {0x0045, 0x0108, 0x0000};
 
 void handleSelectingButtons() {
   // Handle buttons when user is using the arrow cursor to navigate.
@@ -229,13 +282,14 @@ void handleSelectingButtons() {
             moving.addCard(pile->removeTopCard());
             sourcePile = &foundations[i];
             mode = illegalMove;
+            playSoundA();
             break;
           }
         }
       }
     }
   }
-  if (gb.buttons.pressed(BTN_A)) {
+  else if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
       case stock:
         if (stockDeck.getCardCount() != 0) {
@@ -244,9 +298,10 @@ void handleSelectingButtons() {
           card.flip();
           moving.addCard(card);
           moving.x = 1;
-          moving.y = 1;
+          moving.y = 0;
           remainingDraws = min(cardsToDraw - 1, stockDeck.getCardCount()); 
           mode = drawingCards;
+          playSoundA();
         }
         else {
           while (talonDeck.getCardCount() != 0) {
@@ -271,6 +326,7 @@ void handleSelectingButtons() {
         moving.y = cardYPosition(sourcePile, 0);
         sourcePile->removeCards(cardIndex + 1, &moving);
         mode = movingPile;
+        playSoundA();
         break;
     }
   }
@@ -298,6 +354,7 @@ void handleMovingPileButtons() {
     else if (activeLocation >= tableau1) activeLocation = talon;
   }
   if (gb.buttons.pressed(BTN_A)) {
+    playSoundB();
     switch (activeLocation) {
       case talon:
         mode = illegalMove;
@@ -613,30 +670,30 @@ void drawCursor() {
   switch (activeLocation) {
     case stock:
       cursorX = updatePosition(cursorX, 11);
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       break;
     case talon:
       cursorX = updatePosition(cursorX, 23 + 2 * min(2, max(0, talonDeck.getCardCount() - 1)));
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       break;
     case foundation1:
       cursorX = updatePosition(cursorX, 30);
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       flipped = true;
       break;
     case foundation2:
       cursorX = updatePosition(cursorX, 42);
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       flipped = true;
       break;
     case foundation3:
       cursorX = updatePosition(cursorX, 54);
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       flipped = true;
       break;
     case foundation4:
       cursorX = updatePosition(cursorX, 66);
-      cursorY = updatePosition(cursorY, 5);
+      cursorY = updatePosition(cursorY, 4);
       flipped = true;
       break;
     case tableau1:
@@ -665,7 +722,10 @@ void drawCursor() {
 }
 
 void drawDealing() {
-  if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) cardAnimationCount++;
+  if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) {
+    cardAnimationCount++;
+    playSoundA();
+  }
   bool doneDealing = cardAnimationCount == 28;
   for (int i = 0; i < cardAnimationCount; i++) {
     if (cardAnimations[i].x != cardAnimations[i].destX || cardAnimations[i].y != cardAnimations[i].destY) {
@@ -684,8 +744,8 @@ void drawDealing() {
 void drawDrawingCards() {
   drawPile(&moving);
   moving.x = updatePosition(moving.x, 17);
-  moving.y = updatePosition(moving.y, 1);
-  if (moving.x == 17 && moving.y == 1) {
+  moving.y = updatePosition(moving.y, 0);
+  if (moving.x == 17 && moving.y == 0) {
     talonDeck.addCard(moving.getCard(0));
     if (remainingDraws) {
       remainingDraws--;
@@ -694,7 +754,8 @@ void drawDrawingCards() {
       card.flip();
       moving.addCard(card);
       moving.x = 1;
-      moving.y = 1;
+      moving.y = 0;
+      playSoundA();
     }
     else {
       mode = selecting;
@@ -742,6 +803,7 @@ void drawWonGame() {
   if (bounce.y + (14 << 8) > LCDHEIGHT << 8) {
     bounce.y = (LCDHEIGHT - 14) << 8;
     bounce.yVelocity = bounce.yVelocity * -4 / 5;
+    playSoundB();
   }
   drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
   // Check to see if the current card is off the screen.
@@ -880,5 +942,13 @@ void drawSegmentF(byte x, byte y) {
 
 void drawSegmentG(byte x, byte y) {
   gb.display.drawFastHLine(x, y + 2, 3);
+}
+
+void playSoundA() {
+  gb.sound.playPattern(patternA, 0);
+}
+
+void playSoundB() {
+  gb.sound.playPattern(patternB, 0);
 }
 
