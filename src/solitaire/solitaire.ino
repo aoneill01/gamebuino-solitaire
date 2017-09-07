@@ -57,11 +57,18 @@ struct CardBounce {
 CardBounce bounce;
 byte bounceIndex;
 
-const char easy[] PROGMEM = "Easy";
-const char hard[] PROGMEM = "Hard";
-const char* const menu[2] PROGMEM = {
-  easy,
-  hard,
+const char easyOption[] PROGMEM = "Easy";
+const char hardOption[] PROGMEM = "Hard";
+const char* const newGameMenu[2] PROGMEM = {
+  easyOption,
+  hardOption,
+};
+
+const char quitOption[] PROGMEM = "Quit game";
+const char resumeOption[] PROGMEM = "Resume game";
+const char* const pauseMenu[2] PROGMEM = {
+  resumeOption,
+  quitOption
 };
 
 const byte title[] PROGMEM = {64,36,
@@ -131,7 +138,7 @@ void loop() {
   // Main loop.
   if (gb.update()) {
     // Exit to title whenever C is pressed.
-    if (gb.buttons.pressed(BTN_C)) showTitle();
+    if (gb.buttons.pressed(BTN_C)) pause();
     
     // Handle key presses for various modes.
     switch (mode) {
@@ -164,11 +171,24 @@ void showTitle() {
   setupNewGame();
 
   // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
-  byte menuOption;
+  char menuOption;
   do {
-    menuOption = gb.menu(menu, 2);
+    menuOption = gb.menu(newGameMenu, 2);
   } while (menuOption == -1);
   cardsToDraw = menuOption == 0 ? 1 : 3;
+}
+
+void pause() {
+  switch (gb.menu(pauseMenu, 2)) {
+    case 1:
+      // Quit the game
+      showTitle();
+      break;
+    case 0:
+    default:
+      // Resume the game
+      break;
+  }
 }
 
 void setupNewGame() {
