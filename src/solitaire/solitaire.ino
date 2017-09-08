@@ -4,6 +4,7 @@
 #include "pile.h"
 
 #define MAX_CARDS_DRAWN_IN_PILE 10
+#define EEPROM_MAGIC_NUMBER 170
 
 Gamebuino gb;
 
@@ -35,7 +36,7 @@ byte cardsToDraw;
 // Keep track of source pile for returning invalid moves.
 Pile *sourcePile;
 
-Pile stockDeck = Pile(52), talonDeck = Pile(52);
+Pile stockDeck = Pile(52), talonDeck = Pile(24);
 Pile foundations[4] = { Pile(13), Pile(13), Pile(13), Pile(13) };
 Pile tableau[7] = { Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20) };
 
@@ -57,18 +58,23 @@ struct CardBounce {
 CardBounce bounce;
 byte bounceIndex;
 
-const char easyOption[] PROGMEM = "Easy";
-const char hardOption[] PROGMEM = "Hard";
-const char* const newGameMenu[2] PROGMEM = {
+int easyGameCount, easyGamesWon, hardGameCount, hardGamesWon;
+
+const char easyOption[] PROGMEM = "New easy game";
+const char hardOption[] PROGMEM = "New hard game";
+const char statisticsOption[] PROGMEM = "Game statistics";
+const char* const newGameMenu[3] PROGMEM = {
   easyOption,
   hardOption,
+  statisticsOption
 };
 
 const char quitOption[] PROGMEM = "Quit game";
 const char resumeOption[] PROGMEM = "Resume game";
-const char* const pauseMenu[2] PROGMEM = {
+const char* const pauseMenu[3] PROGMEM = {
   resumeOption,
-  quitOption
+  quitOption,
+  statisticsOption
 };
 
 const byte title[] PROGMEM = {64,36,
@@ -131,6 +137,8 @@ void setup() {
   talonDeck.y = 0;
   stockDeck.isTableau = false;
   
+  readEeprom();
+
   showTitle();
 }
 
@@ -172,14 +180,31 @@ void showTitle() {
 
   // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
   char menuOption;
-  do {
-    menuOption = gb.menu(newGameMenu, 2);
+  askAgain: do {
+    menuOption = gb.menu(newGameMenu, 3);
   } while (menuOption == -1);
-  cardsToDraw = menuOption == 0 ? 1 : 3;
+  if (menuOption == 0) {
+    cardsToDraw = 1;
+    easyGameCount++;
+    writeEeprom(false);
+  }
+  else if (menuOption == 1) {
+    cardsToDraw = 3;
+    hardGameCount++;
+    writeEeprom(false);
+  }
+  else {
+    displayStatistics();
+    goto askAgain;
+  }
 }
 
 void pause() {
-  switch (gb.menu(pauseMenu, 2)) {
+  askAgain: switch (gb.menu(pauseMenu, 3)) {
+    case 2:
+      // statistics
+      displayStatistics();
+      goto askAgain;
     case 1:
       // Quit the game
       showTitle();
@@ -467,6 +492,14 @@ void checkWonGame() {
   if (foundations[0].getCardCount() == 13 && foundations[1].getCardCount() == 13 &&
     foundations[2].getCardCount() == 13 && foundations[3].getCardCount() == 13) {
       mode = wonGame;
+      if (cardsToDraw == 1) {
+        easyGamesWon++;
+        writeEeprom(false);
+      }
+      else {
+        hardGamesWon++;
+        writeEeprom(false);
+      }
   }
 }
 
@@ -972,3 +1005,48 @@ void playSoundB() {
   gb.sound.playPattern(patternB, 0);
 }
 
+void readEeprom() {
+  if (EEPROM.read(0) != EEPROM_MAGIC_NUMBER) return;
+
+  EEPROM.get(1, easyGameCount);
+  EEPROM.get(3, easyGamesWon);
+  EEPROM.get(5, hardGameCount);
+  EEPROM.get(7, hardGamesWon);
+
+  // Check to see if saved game.
+  if (EEPROM.read(9)) {
+
+  }
+}
+
+void writeEeprom(bool saveGame) {
+  EEPROM.update(0, EEPROM_MAGIC_NUMBER);
+  EEPROM.put(1, easyGameCount);
+  EEPROM.put(3, easyGamesWon);
+  EEPROM.put(5, hardGameCount);
+  EEPROM.put(7, hardGamesWon);
+
+  EEPROM.update(9, saveGame);
+  if (saveGame) {
+
+  }
+}
+
+void displayStatistics() {
+  while (true) {
+    if (gb.update()) {
+      gb.display.cursorX = 0;
+      gb.display.cursorY = 0;
+      gb.display.print(F("Easy started: "));
+      gb.display.println(easyGameCount);
+      gb.display.print(F("Easy won:     "));
+      gb.display.println(easyGamesWon);
+      gb.display.print(F("Hard started: "));
+      gb.display.println(hardGameCount);
+      gb.display.print(F("Hard won:     "));
+      gb.display.println(hardGamesWon);
+      
+      if (gb.buttons.pressed(BTN_A) || gb.buttons.pressed(BTN_B) || gb.buttons.pressed(BTN_C)) return;
+    }
+  }
+}
