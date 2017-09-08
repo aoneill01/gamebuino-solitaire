@@ -71,9 +71,11 @@ const char* const newGameMenu[3] PROGMEM = {
 
 const char quitOption[] PROGMEM = "Quit game";
 const char resumeOption[] PROGMEM = "Resume game";
-const char* const pauseMenu[3] PROGMEM = {
+const char saveOption[] PROGMEM = "Save for later";
+const char* const pauseMenu[4] PROGMEM = {
   resumeOption,
   quitOption,
+  saveOption,
   statisticsOption
 };
 
@@ -201,13 +203,18 @@ void showTitle() {
 
 void pause() {
   askAgain: switch (gb.menu(pauseMenu, 3)) {
-    case 2:
+    case 3:
       // statistics
       displayStatistics();
       goto askAgain;
     case 1:
       // Quit the game
       showTitle();
+      break;
+    case 2:
+      // Save for later
+      writeEeprom(true);
+      //showTitle();
       break;
     case 0:
     default:
@@ -1028,7 +1035,21 @@ void writeEeprom(bool saveGame) {
 
   EEPROM.update(9, saveGame);
   if (saveGame) {
+    EEPROM.put(10, cardsToDraw);
+    int address = 11;
+    address += savePile(address, &stockDeck);
+    address += savePile(address, &talonDeck);
+    for (int i = 0; i < 4; i++) address += savePile(address, &foundations[i]);
+    for (int i = 0; i < 7; i++) address += savePile(address, &tableau[i]);
+  }
+}
 
+int savePile(int address, Pile *pile) {
+  EEPROM.put(address, pile->getCardCount());
+  for (int i = 0; i < pile->getMaxCards(); i++) {
+    if (pile->getCardCount() > i) {
+      EEPROM.put(address + i + 1, pile->getCard(pile->getCardCount() - i - 1));
+    }
   }
 }
 

@@ -14,6 +14,7 @@ class Pile {
     void empty();
     void shuffle();
     void newDeck();
+    byte getMaxCards() const;
     byte x, y;
     bool isTableau;
     

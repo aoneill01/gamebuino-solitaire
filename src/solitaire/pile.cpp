@@ -63,3 +63,7 @@ void Pile::newDeck() {
     }
   }
 }
+
+byte Pile::getMaxCards() const {
+  return _maxCards;
+}
