@@ -220,7 +220,7 @@ void setupNewGame() {
   activeLocation = stock;
   cardIndex = 0;
   cursorX = 11;
-  cursorY = 5;
+  cursorY = 4;
 
   talonDeck.empty();
   stockDeck.newDeck();
@@ -310,8 +310,10 @@ void handleSelectingButtons() {
         Card card = pile->getCard(0);
         bool foundMatch = false;
         for (int i = 0; i < 4; i++) {
-          if (foundations[i].getCardCount() == 0 && card.getValue() == ace) {
-            foundMatch = true;
+          if (foundations[i].getCardCount() == 0) {
+            if (card.getValue() == ace) {
+              foundMatch = true;
+            }
           }
           else {
             Card card1 = foundations[i].getCard(0);
