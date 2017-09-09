@@ -75,9 +75,11 @@ const char saveOption[] PROGMEM = "Save for later";
 const char* const pauseMenu[4] PROGMEM = {
   resumeOption,
   quitOption,
-  saveOption,
-  statisticsOption
+  statisticsOption,
+  saveOption
 };
+
+bool continueGame;
 
 const byte title[] PROGMEM = {64,36,
 0x0,0x0,0x80,0x0,0x1,0x24,0x0,0x0,
@@ -139,8 +141,6 @@ void setup() {
   talonDeck.y = 0;
   stockDeck.isTableau = false;
   
-  readEeprom();
-
   showTitle();
 }
 
@@ -148,7 +148,10 @@ void loop() {
   // Main loop.
   if (gb.update()) {
     // Exit to title whenever C is pressed.
-    if (gb.buttons.pressed(BTN_C)) pause();
+    if (gb.buttons.pressed(BTN_C)) {
+      pause();
+      return;
+    }
     
     // Handle key presses for various modes.
     switch (mode) {
@@ -179,6 +182,14 @@ void showTitle() {
   gb.pickRandomSeed();
   gb.battery.show = false;
   setupNewGame();
+  readEeprom();
+
+  // If there is a saved game in EEPROM, just skip right to the game.
+  if (continueGame) {
+    writeEeprom(false);
+    mode = selecting;
+    return;
+  }
 
   // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
   char menuOption;
@@ -202,8 +213,8 @@ void showTitle() {
 }
 
 void pause() {
-  askAgain: switch (gb.menu(pauseMenu, 3)) {
-    case 3:
+  askAgain: switch (gb.menu(pauseMenu, mode == selecting ? 4 : 3)) {
+    case 2:
       // statistics
       displayStatistics();
       goto askAgain;
@@ -211,10 +222,10 @@ void pause() {
       // Quit the game
       showTitle();
       break;
-    case 2:
+    case 3:
       // Save for later
       writeEeprom(true);
-      //showTitle();
+      showTitle();
       break;
     case 0:
     default:
@@ -1024,7 +1035,16 @@ void readEeprom() {
 
   // Check to see if saved game.
   if (EEPROM.read(9)) {
-
+    continueGame = true;
+    EEPROM.get(10, cardsToDraw);
+    int address = 11;
+    address += loadPile(address, &stockDeck);
+    address += loadPile(address, &talonDeck);
+    for (int i = 0; i < 4; i++) address += loadPile(address, &foundations[i]);
+    for (int i = 0; i < 7; i++) address += loadPile(address, &tableau[i]);
+  }
+  else {
+    continueGame = false;
   }
 }
 
@@ -1053,6 +1073,18 @@ int savePile(int address, Pile *pile) {
       EEPROM.put(address + i + 1, pile->getCard(pile->getCardCount() - i - 1));
     }
   }
+  return 1 + pile->getMaxCards();
+}
+
+int loadPile(int address, Pile *pile) {
+  pile->empty();
+  byte count = EEPROM.read(address);
+  for (byte i = 0; i < count; i++) {
+    Card card;
+    EEPROM.get(address + i + 1, card);
+    pile->addCard(card);
+  }
+  return 1 + pile->getMaxCards();
 }
 
 void displayStatistics() {
