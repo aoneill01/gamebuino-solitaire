@@ -1,2 +1,3 @@
 src/solitaire/*.hex
 src/solitaire/.vscode/
+build/
