@@ -172,7 +172,7 @@ void loop() {
 }
 
 void showTitle() {
-  gb.display.persistence = true;
+  start: gb.display.persistence = true;
   gb.titleScreen(F(""), title);
   gb.pickRandomSeed();
   gb.battery.show = false;
@@ -180,9 +180,9 @@ void showTitle() {
 
   // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
   char menuOption;
-  askAgain: do {
-    menuOption = gb.menu(newGameMenu, 3);
-  } while (menuOption == -1);
+  askAgain: menuOption = gb.menu(newGameMenu, 3);
+  if (menuOption == -1) goto start;
+
   if (menuOption == 0) {
     cardsToDraw = 1;
     easyGameCount++;
