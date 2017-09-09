@@ -174,7 +174,7 @@ void loop() {
 }
 
 void showTitle() {
-  gb.display.persistence = true;
+  start: gb.display.persistence = true;
   gb.titleScreen(F(""), title);
   gb.pickRandomSeed();
   gb.battery.show = false;
@@ -182,9 +182,9 @@ void showTitle() {
 
   // Ask whether we want easy (flip 1 card per draw) or hard (flip 3 cards per draw).
   char menuOption;
-  askAgain: do {
-    menuOption = gb.menu(newGameMenu, 3);
-  } while (menuOption == -1);
+  askAgain: menuOption = gb.menu(newGameMenu, 3);
+  if (menuOption == -1) goto start;
+
   if (menuOption == 0) {
     cardsToDraw = 1;
     easyGameCount++;
@@ -227,7 +227,7 @@ void setupNewGame() {
   activeLocation = stock;
   cardIndex = 0;
   cursorX = 11;
-  cursorY = 5;
+  cursorY = 4;
 
   talonDeck.empty();
   stockDeck.newDeck();
@@ -317,8 +317,10 @@ void handleSelectingButtons() {
         Card card = pile->getCard(0);
         bool foundMatch = false;
         for (int i = 0; i < 4; i++) {
-          if (foundations[i].getCardCount() == 0 && card.getValue() == ace) {
-            foundMatch = true;
+          if (foundations[i].getCardCount() == 0) {
+            if (card.getValue() == ace) {
+              foundMatch = true;
+            }
           }
           else {
             Card card1 = foundations[i].getCard(0);

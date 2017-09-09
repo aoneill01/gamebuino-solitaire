@@ -1,0 +1,3 @@
+REM Probably only useful to me as this has hard-coded paths...
+arduino-builder -hardware "c:\Program Files (x86)\Arduino\hardware" -tools "c:\Program Files (x86)\Arduino\hardware\tools" -tools "c:\Program Files (x86)\Arduino\tools-builder" -libraries "c:\Program Files (x86)\Arduino\libraries" -libraries "c:\Users\aoneill\Documents\Arduino\libraries" -fqbn arduino:avr:uno -build-path "c:\Projects\gamebuino-solitaire\build" ./src/solitaire/solitaire.ino
+copy build\solitaire.ino.hex bin\SOLITAIR.HEX

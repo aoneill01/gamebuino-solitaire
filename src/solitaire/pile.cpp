@@ -28,7 +28,7 @@ Card Pile::getCard(int indexFromTop) const {
   if (indexFromTop < _count) {
     return _cards[_count - indexFromTop - 1];
   }
-  return Card(two, heart, false);
+  return Card();
 }
 
 Card Pile::removeTopCard() {
