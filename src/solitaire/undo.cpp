@@ -1,27 +1,27 @@
 #include "undo.h"
 
 UndoStack::UndoStack() {
-    bottomIndex = topIndex = 0;
+    index = count = 0;
 }
 
 void UndoStack::pushAction(UndoAction action) {
-    actions[topIndex] = action;
-    topIndex = (topIndex + 1) % UNDO_STACK_SIZE;
-    if (topIndex == bottomIndex) {
-        bottomIndex = (bottomIndex + 1) % UNDO_STACK_SIZE;
-    }
+    actions[index++] = action;
+    if (index >= UNDO_STACK_SIZE) index = 0;
+    count++;
+    if (count > UNDO_STACK_SIZE) count = UNDO_STACK_SIZE;
 }
 
 UndoAction UndoStack::popAction() {
     if (!isEmpty()) {
-        if (topIndex == 0) topIndex = UNDO_STACK_SIZE;
-        else topIndex--;
-        return actions[topIndex];
+        if (index == 0) index = UNDO_STACK_SIZE - 1;
+        else index--;
+        count--;
+        return actions[index];
     }
     // Invalid
     return UndoAction();
 }
 
 bool UndoStack::isEmpty() const {
-    return bottomIndex == topIndex;
+    return count == 0;
 }

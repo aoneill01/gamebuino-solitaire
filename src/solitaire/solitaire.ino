@@ -74,11 +74,13 @@ const char* const newGameMenu[3] PROGMEM = {
 const char quitOption[] PROGMEM = "Quit game";
 const char resumeOption[] PROGMEM = "Resume game";
 const char saveOption[] PROGMEM = "Save for later";
-const char* const pauseMenu[4] PROGMEM = {
+const char undoOption[] PROGMEM = "Undo last move";
+const char* const pauseMenu[5] PROGMEM = {
   resumeOption,
   quitOption,
   statisticsOption,
-  saveOption
+  saveOption,
+  undoOption
 };
 
 bool continueGame;
@@ -215,7 +217,7 @@ void showTitle() {
 }
 
 void pause() {
-  askAgain: switch (gb.menu(pauseMenu, mode == selecting ? 4 : 3)) {
+  askAgain: switch (gb.menu(pauseMenu, mode == selecting ? (undo.isEmpty() ? 4 : 5) : 3)) {
     case 2:
       // statistics
       displayStatistics();
@@ -228,6 +230,10 @@ void pause() {
       // Save for later
       writeEeprom(true);
       showTitle();
+      break;
+    case 4:
+      // Undo
+      performUndo();
       break;
     case 0:
     default:
@@ -325,11 +331,6 @@ void handleSelectingButtons() {
     }
   }
   if (gb.buttons.pressed(BTN_B)) {
-    if (!undo.isEmpty()) {
-      UndoAction action = undo.popAction();
-      action.source->addCard(action.destination->removeTopCard());
-    }
-    /*
     if (activeLocation >= tableau1 || activeLocation == talon) {
       Pile *pile = getActiveLocationPile();
       if (pile->getCardCount() > 0) {
@@ -361,28 +362,26 @@ void handleSelectingButtons() {
         }
       }
     }
-    */
   }
   else if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
       case stock:
         if (stockDeck.getCardCount() != 0) {
           moving.empty();
-          Card card = stockDeck.removeTopCard();
-          card.flip();
-          moving.addCard(card);
-          moving.x = 1;
-          moving.y = 0;
+          drawAndFlip(&stockDeck, &moving);
+          moving.x = stockDeck.x;
+          moving.y = stockDeck.y;
           remainingDraws = min(cardsToDraw - 1, stockDeck.getCardCount()); 
           mode = drawingCards;
           playSoundA();
         }
         else {
           while (talonDeck.getCardCount() != 0) {
-            Card card = talonDeck.removeTopCard();
-            card.flip();
-            stockDeck.addCard(card);
+            drawAndFlip(&talonDeck, &stockDeck);
           }
+          UndoAction action;
+          action.setFlippedTalon();
+          undo.pushAction(action);
         }
         break;
       case talon:
@@ -499,28 +498,37 @@ void moveCards() {
   UndoAction action;
   action.source = sourcePile;
   action.destination = pile;
-  undo.pushAction(action);
+  action.setCardCount(moving.getCardCount());
   pile->addPile(&moving);
   mode = selecting;
-  updateAfterPlay();
+  if (updateAfterPlay()) {
+    action.setRevealed();
+  }
+  undo.pushAction(action);
 }
 
-void updateAfterPlay() {
-  revealCards();
+bool updateAfterPlay() {
+  bool result = revealCards();
   checkWonGame();
   cardIndex = 0;
   bool unused;
   getCursorDestination(cursorX, cursorY, unused);
+  return result;
 }
 
-void revealCards() {
+bool revealCards() {
+  bool revealed = false;
   // Check for cards to reveal.
   for (int i = 0; i < 7; i++) {
     if (tableau[i].getCardCount() == 0) continue;
     Card card = tableau[i].removeTopCard();
-    if (card.isFaceDown()) card.flip();
+    if (card.isFaceDown()) {
+      card.flip();
+      revealed = true;
+    }
     tableau[i].addCard(card);
   }
+  return revealed;
 }
 
 void checkWonGame() {
@@ -834,14 +842,15 @@ void drawDrawingCards() {
     if (remainingDraws) {
       remainingDraws--;
       moving.empty();
-      Card card = stockDeck.removeTopCard();
-      card.flip();
-      moving.addCard(card);
-      moving.x = 1;
-      moving.y = 0;
+      drawAndFlip(&stockDeck, &moving);
+      moving.x = stockDeck.x;
+      moving.y = stockDeck.y;
       playSoundA();
     }
     else {
+      UndoAction action;
+      action.setDraw();
+      undo.pushAction(action);
       mode = selecting;
     }
   }
@@ -1114,5 +1123,41 @@ void displayStatistics() {
       
       if (gb.buttons.pressed(BTN_A) || gb.buttons.pressed(BTN_B) || gb.buttons.pressed(BTN_C)) return;
     }
+  }
+}
+
+void drawAndFlip(Pile *source, Pile *destination) {
+  Card card = source->removeTopCard();
+  card.flip();
+  destination->addCard(card);
+}
+
+void performUndo() {
+  // Make sure there is something to undo.
+  if (!undo.isEmpty() && mode == selecting) {
+    UndoAction action = undo.popAction();
+    // Handle draw from stock.
+    if (action.wasDraw()) {
+      for (byte i = 0; i < cardsToDraw; i++) {
+        drawAndFlip(&talonDeck, &stockDeck);
+      }
+    }
+    // Handle flipped talon.
+    else if (action.wasFlippedTalon()) {
+      while (stockDeck.getCardCount() != 0) {
+        drawAndFlip(&stockDeck, &talonDeck);
+      }
+    }
+    // Handle moving cards from one pile to another.
+    else {
+      // Handle moved cards resulted in revealing another card.
+      if (action.wasRevealed()) {
+        drawAndFlip(action.source, action.source);
+      }
+      moving.empty();
+      action.destination->removeCards(action.getCardCount(), &moving);
+      action.source->addPile(&moving);
+    }
+    updateAfterPlay();
   }
 }
