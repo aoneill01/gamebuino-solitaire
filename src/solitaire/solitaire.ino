@@ -9,7 +9,7 @@
 
 Gamebuino gb;
 
-enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, wonGame };
+enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
 GameMode mode = selecting;
 
@@ -174,7 +174,8 @@ void loop() {
       case selecting: drawCursor(); break;
       case drawingCards: drawDrawingCards(); break;
       case movingPile: drawMovingPile(); break;
-      case illegalMove: drawIllegalMove(); break;
+      case illegalMove:
+      case fastFoundation: drawIllegalMove(); break;
       case wonGame: drawWonGame(); break;
     }
   }
@@ -355,7 +356,7 @@ void handleSelectingButtons() {
             moving.y = cardYPosition(pile, 0);
             moving.addCard(pile->removeTopCard());
             sourcePile = &foundations[i];
-            mode = illegalMove;
+            mode = fastFoundation;
             playSoundA();
             break;
           }
@@ -875,8 +876,17 @@ void drawIllegalMove() {
   // Check to see if the animation is done
   if (moving.x == sourcePile->x && moving.y == sourcePile->y + yDelta) {
     sourcePile->addPile(&moving);
+    bool revealed = updateAfterPlay();
+    // Update undo stack if this was a fast move to the foundation.
+    if (mode == fastFoundation) {
+      UndoAction action;
+      action.source = getActiveLocationPile();
+      action.destination = sourcePile;
+      action.setCardCount(1);
+      if (revealed) action.setRevealed();
+      undo.pushAction(action);
+    }
     mode = selecting;
-    updateAfterPlay();
   }
 }
 
