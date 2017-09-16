@@ -2,6 +2,7 @@
 #include <Gamebuino.h>
 #include <EEPROM.h>
 #include "pile.h"
+#include "undo.h"
 
 #define MAX_CARDS_DRAWN_IN_PILE 10
 #define EEPROM_MAGIC_NUMBER 170
@@ -28,7 +29,6 @@ byte cursorX, cursorY;
 
 // Animating moving stack of cards.
 Pile moving = Pile(13);
-Location returnLocation;
 byte remainingDraws;
 // 3 at a time for hard, 1 at a time for easy
 byte cardsToDraw;
@@ -39,6 +39,8 @@ Pile *sourcePile;
 Pile stockDeck = Pile(52), talonDeck = Pile(24);
 Pile foundations[4] = { Pile(13), Pile(13), Pile(13), Pile(13) };
 Pile tableau[7] = { Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20), Pile(20) };
+
+UndoStack undo;
 
 struct CardAnimation {
   Card card;
@@ -235,6 +237,7 @@ void pause() {
 }
 
 void setupNewGame() {
+  undo = UndoStack();
   activeLocation = stock;
   cardIndex = 0;
   cursorX = 11;
@@ -322,6 +325,11 @@ void handleSelectingButtons() {
     }
   }
   if (gb.buttons.pressed(BTN_B)) {
+    if (!undo.isEmpty()) {
+      UndoAction action = undo.popAction();
+      action.source->addCard(action.destination->removeTopCard());
+    }
+    /*
     if (activeLocation >= tableau1 || activeLocation == talon) {
       Pile *pile = getActiveLocationPile();
       if (pile->getCardCount() > 0) {
@@ -353,6 +361,7 @@ void handleSelectingButtons() {
         }
       }
     }
+    */
   }
   else if (gb.buttons.pressed(BTN_A)) {
     switch (activeLocation) {
@@ -486,7 +495,12 @@ void handleMovingPileButtons() {
 }
 
 void moveCards() {
-  getActiveLocationPile()->addPile(&moving);
+  Pile *pile = getActiveLocationPile();
+  UndoAction action;
+  action.source = sourcePile;
+  action.destination = pile;
+  undo.pushAction(action);
+  pile->addPile(&moving);
   mode = selecting;
   updateAfterPlay();
 }

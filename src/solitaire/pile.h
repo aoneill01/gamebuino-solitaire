@@ -1,6 +1,8 @@
 #include <Gamebuino.h>
 #include "card.h"
 
+#ifndef PILE_H
+#define PILE_H
 class Pile {
   public:
     Pile(byte maxCards);
@@ -23,4 +25,4 @@ class Pile {
     byte _maxCards;
     byte _count;
 };
-
+#endif
