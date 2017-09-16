@@ -495,6 +495,8 @@ void updateAfterPlay() {
   revealCards();
   checkWonGame();
   cardIndex = 0;
+  bool unused;
+  getCursorDestination(cursorX, cursorY, unused);
 }
 
 void revealCards() {
@@ -739,59 +741,54 @@ void drawKing(byte x, byte y) {
 }
 
 void drawCursor() {
-  bool flipped = false;
+  bool flipped;
+  byte x, y;
+  getCursorDestination(x, y, flipped);
+  
+  cursorX = updatePosition(cursorX, x);
+  cursorY = updatePosition(cursorY, y);
+
+  drawCursor(cursorX, cursorY, flipped);
+}
+
+void getCursorDestination(byte& x, byte& y, bool& flipped) {
+  Pile* pile = getActiveLocationPile();
+
   switch (activeLocation) {
     case stock:
-      cursorX = updatePosition(cursorX, 11);
-      cursorY = updatePosition(cursorY, 4);
+      x = pile->x + 10;
+      y = pile->y + 4;
+      flipped = false;
       break;
     case talon:
-      cursorX = updatePosition(cursorX, 23 + 2 * min(2, max(0, talonDeck.getCardCount() - 1)));
-      cursorY = updatePosition(cursorY, 4);
+      x = pile->x + 10 + 2 * min(2, max(0, pile->getCardCount() - 1));
+      y = pile->y + 4;
+      flipped = false;
       break;
     case foundation1:
-      cursorX = updatePosition(cursorX, 30);
-      cursorY = updatePosition(cursorY, 4);
-      flipped = true;
-      break;
     case foundation2:
-      cursorX = updatePosition(cursorX, 42);
-      cursorY = updatePosition(cursorY, 4);
-      flipped = true;
-      break;
     case foundation3:
-      cursorX = updatePosition(cursorX, 54);
-      cursorY = updatePosition(cursorY, 4);
-      flipped = true;
-      break;
     case foundation4:
-      cursorX = updatePosition(cursorX, 66);
-      cursorY = updatePosition(cursorY, 4);
+      x = pile->x - 7;
+      y = pile->y + 4;
       flipped = true;
       break;
     case tableau1:
     case tableau2:
     case tableau3:
+      x = pile->x + 10;
+      y = (cardIndex == 0 ? 4 : -2) + cardYPosition(pile, cardIndex);
+      flipped = false;
+      break;
     case tableau4:
     case tableau5:
     case tableau6:
     case tableau7:
-      if (activeLocation <= tableau3) {
-        cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x + 10);
-      }
-      else {
-        cursorX = updatePosition(cursorX, tableau[activeLocation - tableau1].x - 7);
-        flipped = true;
-      }
-      if (cardIndex == 0) {
-        cursorY = updatePosition(cursorY, 4 + cardYPosition(getActiveLocationPile(), cardIndex));
-      }
-      else {
-        cursorY = updatePosition(cursorY, -2 + cardYPosition(getActiveLocationPile(), cardIndex));
-      }
+      x = pile->x - 7;
+      y = (cardIndex == 0 ? 4 : -2) + cardYPosition(pile, cardIndex);
+      flipped = true;
       break;
   }
-  drawCursor(cursorX, cursorY, flipped);
 }
 
 void drawDealing() {
