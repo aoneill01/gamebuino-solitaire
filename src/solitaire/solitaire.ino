@@ -386,6 +386,10 @@ void handleSelectingButtons() {
         }
         break;
       case talon:
+      case foundation1:
+      case foundation2:
+      case foundation3:
+      case foundation4:
       case tableau1:
       case tableau2:
       case tableau3:
