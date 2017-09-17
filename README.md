@@ -35,6 +35,7 @@ See https://en.wikipedia.org/wiki/Klondike_(solitaire) for general Klondike soli
 - **Quit game** - Quit the game and return to the title screen. You will not be able to return to this game.
 - **Game statistics** - Display the number of games started and won for both easy and hard.
 - **Save for later** - *Only available when you are in selection mode. If you are actively moving cards, this won't be available.* Saves the game state and returns to the title screen. You can then turn the system off, turn it back on, and continue from where you were at. Once you continue, the save state is cleared.
+- **Undo last move** - *Only available when you are in selection mode and there is move to undo.*
 
 ### Gameplay
 
