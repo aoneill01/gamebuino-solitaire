@@ -4,7 +4,7 @@
 #define UNDO_STACK_SIZE 10
 
 struct UndoAction {
-    byte special;
+    byte special = 0;
     Pile *source;
     Pile *destination;
     void setCardCount(byte cardCount) { special = (special & 0xf0) | (cardCount & 0x0f); }

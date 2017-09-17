@@ -877,6 +877,7 @@ void drawIllegalMove() {
   if (moving.x == sourcePile->x && moving.y == sourcePile->y + yDelta) {
     sourcePile->addPile(&moving);
     bool revealed = updateAfterPlay();
+    
     // Update undo stack if this was a fast move to the foundation.
     if (mode == fastFoundation) {
       UndoAction action;
@@ -886,7 +887,7 @@ void drawIllegalMove() {
       if (revealed) action.setRevealed();
       undo.pushAction(action);
     }
-    mode = selecting;
+    if (mode != wonGame) mode = selecting;
   }
 }
 
